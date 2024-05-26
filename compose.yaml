@@ -1,0 +1,19 @@
+name: arpacik
+
+services:
+  posgtes:
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_USER: arpacik
+      POSTGRES_PASSWORD: GRoButChN43Wrzt5IXs6hBzLGtFKnRxz
+      POSTGRES_DB: sogan
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5499:5432"
+
+volumes:
+  postgres-data:
+    driver: local

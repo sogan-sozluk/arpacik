@@ -1,0 +1,10 @@
+[package]
+name = "arpacik"
+version = "0.0.1"
+edition = "2021"
+
+[workspace]
+members = [".", "api", "service", "entity", "migration"]
+
+[dependencies]
+api = { path = "api" }
