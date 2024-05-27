@@ -33,7 +33,24 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(ColumnDef::new(User::PasswordHash).string().not_null())
-                    .col(ColumnDef::new(User::SilenceEndDate).date().null())
+                    .col(
+                        ColumnDef::new(User::IsAdmin)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(User::IsModerator)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(User::IsAuthor)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
                     .col(
                         ColumnDef::new(User::CreatedAt)
                             .timestamp()
@@ -47,6 +64,35 @@ impl MigrationTrait for Migration {
                             .default(current_timestamp_utc()),
                     )
                     .col(ColumnDef::new(User::DeletedAt).timestamp().null())
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .table(SilencedUser::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(SilencedUser::Id)
+                            .integer()
+                            .not_null()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(SilencedUser::UserId).integer().not_null())
+                    .col(
+                        ColumnDef::new(SilencedUser::Reason)
+                            .string_len(255)
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(SilencedUser::EndDate).date().not_null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk-silenced_user-user_id")
+                            .from(SilencedUser::Table, SilencedUser::UserId)
+                            .to(User::Table, User::Id),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -68,6 +114,12 @@ impl MigrationTrait for Migration {
                             .string_len(75)
                             .unique_key()
                             .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Title::IsVisible)
+                            .boolean()
+                            .not_null()
+                            .default(true),
                     )
                     .to_owned(),
             )
@@ -286,11 +338,15 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
-            .drop_table(Table::drop().table(User::Table).to_owned())
+            .drop_table(Table::drop().table(Token::Table).to_owned())
             .await?;
 
         manager
-            .drop_table(Table::drop().table(Token::Table).to_owned())
+            .drop_table(Table::drop().table(SilencedUser::Table).to_owned())
+            .await?;
+
+        manager
+            .drop_table(Table::drop().table(User::Table).to_owned())
             .await?;
 
         Ok(())
@@ -304,10 +360,21 @@ enum User {
     Nickname,
     Email,
     PasswordHash,
-    SilenceEndDate,
+    IsAdmin,
+    IsModerator,
+    IsAuthor,
     CreatedAt,
     UpdatedAt,
     DeletedAt,
+}
+
+#[derive(DeriveIden)]
+enum SilencedUser {
+    Table,
+    Id,
+    UserId,
+    Reason,
+    EndDate,
 }
 
 #[derive(DeriveIden)]
@@ -315,6 +382,7 @@ enum Title {
     Table,
     Id,
     Name,
+    IsVisible,
 }
 
 #[derive(DeriveIden)]
