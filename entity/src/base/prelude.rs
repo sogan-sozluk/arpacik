@@ -3,6 +3,8 @@
 pub use super::downvote::Entity as Downvote;
 pub use super::entry::Entity as Entry;
 pub use super::favorite::Entity as Favorite;
+pub use super::silenced_user::Entity as SilencedUser;
 pub use super::title::Entity as Title;
+pub use super::token::Entity as Token;
 pub use super::upvote::Entity as Upvote;
 pub use super::user::Entity as User;
