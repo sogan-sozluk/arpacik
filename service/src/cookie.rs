@@ -86,6 +86,15 @@ impl std::fmt::Display for CookieJar {
     }
 }
 
+pub fn extract_cookie_value<'a>(cookie: &'a str, name: &str) -> Option<&'a str> {
+    let name = format!("{}=", name);
+    let start = cookie.find(&name)?;
+    let start = start + name.len();
+    let end = cookie[start..].find(';').unwrap_or(cookie.len() - start);
+
+    Some(&cookie[start..start + end])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,5 +150,58 @@ mod tests {
         jar.add(cookie.clone());
         jar.clear();
         assert_eq!(jar.cookies.len(), 0);
+    }
+
+    #[test]
+    fn test_cookie_jar_display() {
+        let mut jar = CookieJar::new();
+        let now = chrono::Utc::now();
+        jar.add(Cookie {
+            name: "name".to_string(),
+            value: "value".to_string(),
+            domain: Some("example.com".to_string()),
+            path: Some("/".to_string()),
+            expires: Some(now),
+            http_only: true,
+            secure: true,
+            same_site: Some("Strict".to_string()),
+        });
+        assert_eq!(
+            jar.to_string(),
+            format!(
+                "name=value; Domain=example.com; Path=/; Expires={}; HttpOnly; Secure; SameSite=Strict; ",
+                now.to_rfc2822()
+            )
+        );
+    }
+
+    #[test]
+    fn test_extract_value() {
+        let cookie_request = "name=value; location=istanbul; theme=dark; lang=en";
+        assert_eq!(extract_cookie_value(cookie_request, "name"), Some("value"));
+        assert_eq!(
+            extract_cookie_value(cookie_request, "location"),
+            Some("istanbul")
+        );
+        assert_eq!(extract_cookie_value(cookie_request, "theme"), Some("dark"));
+        assert_eq!(extract_cookie_value(cookie_request, "lang"), Some("en"));
+
+        let cookie_request_no_whitespace = "name=value;location=istanbul;theme=dark;lang=en";
+        assert_eq!(
+            extract_cookie_value(cookie_request_no_whitespace, "name"),
+            Some("value")
+        );
+        assert_eq!(
+            extract_cookie_value(cookie_request_no_whitespace, "location"),
+            Some("istanbul")
+        );
+        assert_eq!(
+            extract_cookie_value(cookie_request_no_whitespace, "theme"),
+            Some("dark")
+        );
+        assert_eq!(
+            extract_cookie_value(cookie_request_no_whitespace, "lang"),
+            Some("en")
+        );
     }
 }
