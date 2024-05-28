@@ -10,10 +10,12 @@ pub async fn register(
 ) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
     match service::auth::register(&state.conn, json_data.0).await {
         Ok(_) => Ok(StatusCode::CREATED),
-        Err(e) => Err((
-            // TODO: Use the error status code from the service layer
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(e.into_error_response()),
-        )),
+        Err(e) => {
+            let error_response = e.into_error_response();
+            Err((
+                StatusCode::from_u16(error_response.code).unwrap(),
+                Json(error_response),
+            ))
+        }
     }
 }

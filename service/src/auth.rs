@@ -11,7 +11,11 @@ use validator::Validate;
 pub async fn register(db: &DbConn, register_request: RegisterRequest) -> Result<UserActiveModel> {
     match register_request.validate() {
         Ok(_) => (),
-        Err(e) => return Err(Error::InvalidRequest(e.to_string())),
+        Err(_) => {
+            return Err(Error::InvalidRequest(
+                "Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string(),
+            ));
+        }
     }
 
     let argon2 = Argon2::default();
@@ -32,6 +36,13 @@ pub async fn register(db: &DbConn, register_request: RegisterRequest) -> Result<
 
     match result {
         Ok(user) => Ok(user),
-        Err(e) => Err(Error::InternalError(e.to_string())),
+        Err(e) => {
+            if e.to_string().contains("duplicate key value") {
+                return Err(Error::InvalidRequest(
+                    "Bu e-posta adresi veya kullanıcı adı zaten kullanımda.".to_string(),
+                ));
+            }
+            Err(Error::InternalError(e.to_string()))
+        }
     }
 }
