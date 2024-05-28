@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod cookie;
 pub mod dto;
 pub mod error;
 pub mod validation;

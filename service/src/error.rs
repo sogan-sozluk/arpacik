@@ -16,6 +16,8 @@ pub enum Error {
     InternalError(String),
     #[error("Geçersiz istek: {0}")]
     InvalidRequest(String),
+    #[error("Geçersiz kullanıcı adı veya parola")]
+    InvalidCredentials,
 }
 
 pub trait IntoErrorResponse {
@@ -34,6 +36,11 @@ impl IntoErrorResponse for Error {
                 code: 400,
                 error: "Geçersiz istek".to_string(),
                 details: Some(e.to_string()),
+            },
+            Error::InvalidCredentials => ErrorResponse {
+                code: 401,
+                error: "Geçersiz kullanıcı adı veya parola".to_string(),
+                details: None,
             },
         }
     }
