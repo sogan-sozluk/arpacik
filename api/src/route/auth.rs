@@ -1,11 +1,10 @@
+use crate::middleware::auth::get_cookie;
+use crate::AppState;
 use axum::http::header::SET_COOKIE;
 use axum::http::HeaderMap;
 use axum::{extract::State, http::StatusCode, Json};
 use service::dto::auth::{LoginRequest, RegisterRequest};
 use service::error::{ErrorResponse, IntoErrorResponse};
-
-use crate::middleware::auth::get_cookie;
-use crate::AppState;
 
 pub async fn register(
     state: State<AppState>,
