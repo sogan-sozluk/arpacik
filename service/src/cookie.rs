@@ -1,3 +1,5 @@
+use crate::token::{is_admin, is_author, is_moderator, is_token_valid};
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Cookie {
     pub name: String,
@@ -23,6 +25,36 @@ impl Cookie {
             same_site: Some("Strict".to_string()),
         }
     }
+
+    pub fn domain(mut self, domain: &str) -> Self {
+        self.domain = Some(domain.to_string());
+        self
+    }
+
+    pub fn path(mut self, path: &str) -> Self {
+        self.path = Some(path.to_string());
+        self
+    }
+
+    pub fn expires(mut self, expires: Option<chrono::DateTime<chrono::Utc>>) -> Self {
+        self.expires = expires;
+        self
+    }
+
+    pub fn http_only(mut self, http_only: bool) -> Self {
+        self.http_only = http_only;
+        self
+    }
+
+    pub fn secure(mut self, secure: bool) -> Self {
+        self.secure = secure;
+        self
+    }
+
+    pub fn same_site(mut self, same_site: &str) -> Self {
+        self.same_site = Some(same_site.to_string());
+        self
+    }
 }
 
 impl std::fmt::Display for Cookie {
@@ -46,6 +78,7 @@ impl std::fmt::Display for Cookie {
         if let Some(same_site) = &self.same_site {
             write!(f, "SameSite={}; ", same_site)?;
         }
+
         Ok(())
     }
 }
@@ -93,6 +126,74 @@ pub fn extract_cookie_value<'a>(cookie: &'a str, name: &str) -> Option<&'a str> 
     let end = cookie[start..].find(';').unwrap_or(cookie.len() - start);
 
     Some(&cookie[start..start + end])
+}
+
+pub fn authorize(cookie: &str) -> bool {
+    let key = match std::env::var("JWT_SECRET") {
+        Ok(key) => key,
+        Err(_) => return false,
+    };
+
+    let token = match extract_cookie_value(cookie, "token") {
+        Some(token) => token,
+        None => return false,
+    };
+
+    is_token_valid(token, &key)
+}
+
+pub fn authorize_admin(cookie: &str) -> bool {
+    let key = match std::env::var("JWT_SECRET") {
+        Ok(key) => key,
+        Err(_) => return false,
+    };
+
+    let token = match extract_cookie_value(cookie, "token") {
+        Some(token) => token,
+        None => return false,
+    };
+
+    if !is_token_valid(token, &key) {
+        return false;
+    }
+
+    is_admin(token, &key)
+}
+
+pub fn authorize_moderator(cookie: &str) -> bool {
+    let key = match std::env::var("JWT_SECRET") {
+        Ok(key) => key,
+        Err(_) => return false,
+    };
+
+    let token = match extract_cookie_value(cookie, "token") {
+        Some(token) => token,
+        None => return false,
+    };
+
+    if !is_token_valid(token, &key) {
+        return false;
+    }
+
+    is_moderator(token, &key)
+}
+
+pub fn authorize_author(cookie: &str) -> bool {
+    let key = match std::env::var("JWT_SECRET") {
+        Ok(key) => key,
+        Err(_) => return false,
+    };
+
+    let token = match extract_cookie_value(cookie, "token") {
+        Some(token) => token,
+        None => return false,
+    };
+
+    if !is_token_valid(token, &key) {
+        return false;
+    }
+
+    is_author(token, &key)
 }
 
 #[cfg(test)]

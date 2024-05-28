@@ -1,15 +1,16 @@
 use std::env;
 
-use crate::claims::UserClaims;
-use crate::cookie::Cookie;
+use crate::cookie::{extract_cookie_value, Cookie};
 use crate::dto::auth::{LoginRequest, RegisterRequest};
 use crate::error::{Error, Result};
+use crate::token::UserClaims;
 use ::entity::prelude::*;
 use argon2::PasswordVerifier;
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
     Argon2,
 };
+use chrono::TimeZone;
 use sea_orm::*;
 use validator::Validate;
 
@@ -131,7 +132,55 @@ pub async fn login(db: &DbConn, request: LoginRequest) -> Result<Cookie> {
         }
     }
 
-    let cookie = Cookie::new("token", &token);
+    let cookie = Cookie::new("token", &token)
+        .path("/")
+        .http_only(true)
+        .secure(true);
 
     Ok(cookie)
+}
+
+pub async fn logout(db: &DbConn, cookie: &str) -> Result<Cookie> {
+    let token = match extract_cookie_value(cookie, "token") {
+        Some(token) => token,
+        None => return Err(Error::InvalidToken),
+    };
+
+    let token_hash = blake3::hash(token.as_bytes()).to_hex().to_string();
+
+    let token = Token::find()
+        .filter(TokenColumn::Hash.eq(token_hash))
+        .filter(TokenColumn::InvalidatedAt.is_null())
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Token bulunamadı.".to_string()))?;
+
+    let token = token.ok_or(Error::InvalidToken)?;
+
+    let mut token = token.into_active_model();
+    token.invalidated_at = Set(Some(chrono::Utc::now().naive_utc()));
+
+    let result = token.save(db).await;
+
+    let expires = Some(chrono::Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 0).unwrap());
+    let cookie = Cookie::new("token", "").path("/").expires(expires);
+
+    match result {
+        Ok(_) => Ok(cookie),
+        Err(e) => Err(Error::InternalError(e.to_string())),
+    }
+}
+
+async fn _is_token_invalidated(db: &DbConn, token: &str) -> bool {
+    let token_hash = blake3::hash(token.as_bytes()).to_hex().to_string();
+
+    let token = Token::find()
+        .filter(TokenColumn::Hash.eq(token_hash))
+        .filter(TokenColumn::InvalidatedAt.is_null())
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Token bulunamadı.".to_string()))
+        .unwrap();
+
+    token.is_none()
 }

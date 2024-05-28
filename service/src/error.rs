@@ -18,6 +18,10 @@ pub enum Error {
     InvalidRequest(String),
     #[error("Geçersiz kullanıcı adı veya parola")]
     InvalidCredentials,
+    #[error("Geçersiz token")]
+    InvalidToken,
+    #[error("Kimlik doğrulama hatası: {0}")]
+    AuthError(String),
 }
 
 pub trait IntoErrorResponse {
@@ -41,6 +45,16 @@ impl IntoErrorResponse for Error {
                 code: 401,
                 error: "Geçersiz kullanıcı adı veya parola".to_string(),
                 details: None,
+            },
+            Error::InvalidToken => ErrorResponse {
+                code: 401,
+                error: "Geçersiz token".to_string(),
+                details: Some("Token geçerli değil veya süresi dolmuş olabilir.".to_string()),
+            },
+            Error::AuthError(e) => ErrorResponse {
+                code: 401,
+                error: e.split(':').next().unwrap().to_string(),
+                details: Some(e.to_string()),
             },
         }
     }
