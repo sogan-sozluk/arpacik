@@ -8,8 +8,8 @@ use argon2::{
 use sea_orm::*;
 use validator::Validate;
 
-pub async fn register(db: &DbConn, register_request: RegisterRequest) -> Result<UserActiveModel> {
-    match register_request.validate() {
+pub async fn register(db: &DbConn, request: RegisterRequest) -> Result<UserActiveModel> {
+    match request.validate() {
         Ok(_) => (),
         Err(_) => {
             return Err(Error::InvalidRequest(
@@ -21,13 +21,13 @@ pub async fn register(db: &DbConn, register_request: RegisterRequest) -> Result<
     let argon2 = Argon2::default();
     let salt = SaltString::generate(&mut OsRng);
     let password_hash = argon2
-        .hash_password(register_request.password.as_bytes(), &salt)
+        .hash_password(request.password.as_bytes(), &salt)
         .unwrap()
         .to_string();
 
     let result = UserActiveModel {
-        nickname: Set(register_request.nickname),
-        email: Set(register_request.email),
+        nickname: Set(request.nickname),
+        email: Set(request.email),
         password_hash: Set(password_hash),
         ..Default::default()
     }
