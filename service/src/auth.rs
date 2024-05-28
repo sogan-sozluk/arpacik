@@ -1,6 +1,11 @@
-use crate::dto::auth::RegisterRequest;
+use std::env;
+
+use crate::claims::UserClaims;
+use crate::cookie::Cookie;
+use crate::dto::auth::{LoginRequest, RegisterRequest};
 use crate::error::{Error, Result};
 use ::entity::prelude::*;
+use argon2::PasswordVerifier;
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
     Argon2,
@@ -45,4 +50,88 @@ pub async fn register(db: &DbConn, request: RegisterRequest) -> Result<UserActiv
             Err(Error::InternalError(e.to_string()))
         }
     }
+}
+
+pub async fn login(db: &DbConn, request: LoginRequest) -> Result<Cookie> {
+    match request.validate() {
+        Ok(_) => (),
+        Err(_) => {
+            return Err(Error::InvalidRequest(
+                "Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string(),
+            ));
+        }
+    }
+
+    let user = User::find()
+        .filter(UserColumn::Nickname.contains(request.nickname))
+        .filter(UserColumn::DeletedAt.is_null())
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))?;
+
+    let user = user.ok_or(Error::InvalidCredentials)?;
+    let parsed_hash = match argon2::PasswordHash::new(&user.password_hash) {
+        Ok(parsed_hash) => parsed_hash,
+        Err(_) => {
+            return Err(Error::InternalError(
+                "Kullanıcı parolası hatalı.".to_string(),
+            ))
+        }
+    };
+
+    let argon2 = Argon2::default();
+    if argon2
+        .verify_password(request.password.as_bytes(), &parsed_hash)
+        .is_err()
+    {
+        return Err(Error::InvalidCredentials);
+    }
+
+    let claims = UserClaims {
+        id: user.id,
+        nickname: user.nickname,
+        email: user.email,
+        is_admin: user.is_admin,
+        is_moderator: user.is_moderator,
+        is_author: user.is_author,
+        iat: chrono::Utc::now().timestamp(),
+        exp: chrono::Utc::now().timestamp() + 60 * 60 * 24,
+    };
+
+    let key = match env::var("JWT_SECRET") {
+        Ok(key) => key.into_bytes(),
+        Err(_) => return Err(Error::InternalError("JWT_SECRET is not set".to_string())),
+    };
+
+    let token = jsonwebtoken::encode(
+        &jsonwebtoken::Header::default(),
+        &claims,
+        &jsonwebtoken::EncodingKey::from_secret(&key),
+    );
+
+    let token = match token {
+        Ok(token) => token,
+        Err(_) => return Err(Error::InternalError("Token oluşturulamadı.".to_string())),
+    };
+
+    let token_hash = blake3::hash(token.as_bytes()).to_hex().to_string();
+
+    let result = TokenActiveModel {
+        user_id: Set(user.id),
+        hash: Set(token_hash),
+        ..Default::default()
+    }
+    .save(db)
+    .await;
+
+    match result {
+        Ok(_) => (),
+        Err(e) => {
+            return Err(Error::InternalError(e.to_string()));
+        }
+    }
+
+    let cookie = Cookie::new("token", &token);
+
+    Ok(cookie)
 }
