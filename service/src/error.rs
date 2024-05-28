@@ -21,7 +21,7 @@ pub enum Error {
     #[error("Geçersiz token")]
     InvalidToken,
     #[error("Kimlik doğrulama hatası: {0}")]
-    AuthError(String),
+    Unauthorized(String),
 }
 
 pub trait IntoErrorResponse {
@@ -51,7 +51,7 @@ impl IntoErrorResponse for Error {
                 error: "Geçersiz token".to_string(),
                 details: Some("Token geçerli değil veya süresi dolmuş olabilir.".to_string()),
             },
-            Error::AuthError(e) => ErrorResponse {
+            Error::Unauthorized(e) => ErrorResponse {
                 code: 401,
                 error: e.split(':').next().unwrap().to_string(),
                 details: Some(e.to_string()),
