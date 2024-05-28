@@ -3,6 +3,7 @@ use migration::{Migrator, MigratorTrait};
 use service::sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use std::env;
 
+mod middleware;
 mod route;
 
 #[tokio::main]

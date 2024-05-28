@@ -4,6 +4,7 @@ use axum::{extract::State, http::StatusCode, Json};
 use service::dto::auth::{LoginRequest, RegisterRequest};
 use service::error::{ErrorResponse, IntoErrorResponse};
 
+use crate::middleware::auth::get_cookie;
 use crate::AppState;
 
 pub async fn register(
@@ -39,5 +40,20 @@ pub async fn login(
                 Json(error_response),
             ))
         }
+    }
+}
+
+pub async fn logout(
+    state: State<AppState>,
+    headers: HeaderMap,
+) -> Result<(HeaderMap, StatusCode), StatusCode> {
+    let cookie = get_cookie(&headers).ok_or(StatusCode::UNAUTHORIZED)?;
+    match service::auth::logout(&state.conn, &cookie).await {
+        Ok(cookie) => {
+            let mut headers = HeaderMap::new();
+            headers.insert(SET_COOKIE, cookie.to_string().parse().unwrap());
+            Ok((headers, StatusCode::OK))
+        }
+        Err(_) => Err(StatusCode::UNAUTHORIZED),
     }
 }
