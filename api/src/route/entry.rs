@@ -1,5 +1,5 @@
 use axum::{
-    extract::State,
+    extract::{Path, State},
     http::{HeaderMap, StatusCode},
     Json,
 };
@@ -22,6 +22,27 @@ pub async fn create_entry(
     ))?;
     match service::entry::create_entry(&state.conn, json_data.0, &cookie).await {
         Ok(_) => Ok(StatusCode::CREATED),
+        Err(e) => {
+            let error_response = e.into_error_response();
+            Err((
+                StatusCode::from_u16(error_response.code).unwrap(),
+                Json(error_response),
+            ))
+        }
+    }
+}
+
+pub async fn delete_entry(
+    state: State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<i32>,
+) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
+    let cookie = get_cookie(&headers).ok_or((
+        StatusCode::UNAUTHORIZED,
+        Json(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response()),
+    ))?;
+    match service::entry::delete_entry(&state.conn, id, &cookie).await {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
         Err(e) => {
             let error_response = e.into_error_response();
             Err((

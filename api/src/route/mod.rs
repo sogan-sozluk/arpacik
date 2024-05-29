@@ -1,7 +1,7 @@
 use crate::AppState;
 use axum::{
     middleware,
-    routing::{get, post},
+    routing::{delete, get, post},
     Router,
 };
 
@@ -13,6 +13,7 @@ pub fn build(state: AppState) -> Router {
     let api_router = Router::new()
         .route("/auth/logout", post(auth::logout))
         .route("/entry", post(entry::create_entry))
+        .route("/entry/:id", delete(entry::delete_entry))
         .route_layer(middleware::from_fn(crate::middleware::auth::auth))
         .route("/hello", get(hello::hello_world))
         .route("/auth/register", post(auth::register))
