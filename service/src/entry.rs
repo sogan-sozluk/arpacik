@@ -1,5 +1,6 @@
 use crate::{
     cookie::extract_cookie_value,
+    dto::{entry::EntryDto, pagination::PaginationRequest},
     title::{create_title, title_id_by_name},
     user::user_by_token,
     Error, Result,
@@ -74,4 +75,76 @@ pub async fn delete_entry(db: &DbConn, id: i32, cookie: &str) -> Result<()> {
         .map_err(|_| Error::InternalError("Girdi silinemedi.".to_string()))?;
 
     Ok(())
+}
+
+pub async fn get_entry(db: &DbConn, id: i32) -> Result<EntryDto> {
+    let entry = Entry::find()
+        .filter(EntryColumn::Id.eq(id))
+        .filter(EntryColumn::DeletedAt.is_null())
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Girdi bulunamadı.".to_string()))
+        .and_then(|entry| entry.ok_or(Error::NotFound("Girdi bulunamadı.".to_string())))?;
+
+    let user = User::find()
+        .filter(UserColumn::Id.eq(entry.user_id))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
+        .and_then(|user| user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string())))?;
+
+    let title = Title::find()
+        .filter(TitleColumn::Id.eq(entry.title_id))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Başlık bulunamadı.".to_string()))
+        .and_then(|title| title.ok_or(Error::NotFound("Başlık bulunamadı.".to_string())))?;
+
+    Ok(EntryDto {
+        id: entry.id,
+        title_id: title.id,
+        title: title.name,
+        content: entry.content,
+        user_id: user.id,
+        user_nickname: user.nickname,
+        created_at: entry.created_at.to_string(),
+        updated_at: entry.updated_at.to_string(),
+    })
+}
+
+pub async fn get_title_entries(
+    db: &DbConn,
+    title_id: i32,
+    pagination: PaginationRequest,
+) -> Result<Vec<EntryDto>> {
+    pagination.validate().map_err(|_| {
+        Error::InvalidRequest("Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string())
+    })?;
+
+    let entry_pages = Entry::find()
+        .filter(EntryColumn::TitleId.eq(title_id))
+        .filter(EntryColumn::DeletedAt.is_null())
+        .order_by_asc(EntryColumn::CreatedAt)
+        .paginate(db, pagination.per_page);
+
+    let mut entry_dtos = Vec::new();
+    let entries = entry_pages
+        .fetch_page(pagination.page)
+        .await
+        .map_err(|_| Error::InternalError("Girdiler getirilemedi.".to_string()))?;
+
+    entries.into_iter().for_each(|entry| {
+        entry_dtos.push(EntryDto {
+            id: entry.id,
+            title_id: entry.title_id,
+            title: "".to_string(),
+            content: entry.content,
+            user_id: entry.user_id,
+            user_nickname: "".to_string(),
+            created_at: entry.created_at.to_string(),
+            updated_at: entry.updated_at.to_string(),
+        });
+    });
+
+    Ok(entry_dtos)
 }

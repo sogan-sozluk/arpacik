@@ -12,10 +12,12 @@ pub mod hello;
 pub fn build(state: AppState) -> Router {
     let api_router = Router::new()
         .route("/auth/logout", post(auth::logout))
-        .route("/entry", post(entry::create_entry))
-        .route("/entry/:id", delete(entry::delete_entry))
+        .route("/entries", post(entry::create_entry))
+        .route("/entries/:id", delete(entry::delete_entry))
         .route_layer(middleware::from_fn(crate::middleware::auth::auth))
         .route("/hello", get(hello::hello_world))
+        .route("/entries/:id", get(entry::get_entry))
+        .route("/titles/:id/entries", get(entry::get_title_entries))
         .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login))
         .with_state(state.clone());
