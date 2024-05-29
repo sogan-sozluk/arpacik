@@ -130,27 +130,132 @@ pub async fn get_title_entries(
         .order_by_asc(EntryColumn::CreatedAt)
         .paginate(db, pagination.per_page);
 
-    let mut entry_dtos = Vec::new();
     let entries = entry_pages
         .fetch_page(pagination.page)
         .await
         .map_err(|_| Error::InternalError("Girdiler getirilemedi.".to_string()))?;
 
-    entries.into_iter().for_each(|entry| {
-        entry_dtos.push(EntryDto {
-            id: entry.id,
-            title_id: entry.title_id,
-            title: "".to_string(),
-            content: entry.content,
-            user_id: entry.user_id,
-            user_nickname: "".to_string(),
-            created_at: entry.created_at.to_string(),
-            updated_at: entry.updated_at.to_string(),
-        });
+    let title_name = Title::find()
+        .filter(TitleColumn::Id.eq(title_id))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Başlık adı getirilemedi.".to_string()))
+        .and_then(|title| title.ok_or(Error::NotFound("Başlık adı getirilemedi.".to_string())))?
+        .name;
+
+    let entry_dto_futures = entries.into_iter().map(|entry| {
+        let db = db.clone();
+        let title_name = title_name.clone();
+        async move {
+            let user_nickname = User::find()
+                .filter(UserColumn::Id.eq(entry.user_id))
+                .one(&db)
+                .await
+                .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
+                .and_then(|user| user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string())))?
+                .nickname;
+
+            Ok(EntryDto {
+                id: entry.id,
+                title_id: entry.title_id,
+                title: title_name,
+                content: entry.content,
+                user_id: entry.user_id,
+                user_nickname,
+                created_at: entry.created_at.to_string(),
+                updated_at: entry.updated_at.to_string(),
+            })
+        }
     });
+
+    let entry_dtos: Result<Vec<EntryDto>> = futures::future::join_all(entry_dto_futures)
+        .await
+        .into_iter()
+        .collect();
+
+    let entry_dtos =
+        entry_dtos.map_err(|_| Error::InternalError("Girdi DTO'ları getirilemedi.".to_string()))?;
 
     let total = Entry::find()
         .filter(EntryColumn::TitleId.eq(title_id))
+        .filter(EntryColumn::DeletedAt.is_null())
+        .count(db)
+        .await
+        .map_err(|_| Error::InternalError("Girdi sayısı getirilemedi.".to_string()))?;
+
+    Ok(PaginationResponse {
+        total,
+        page: pagination.page,
+        per_page: pagination.per_page,
+        data: entry_dtos,
+    })
+}
+
+pub async fn get_user_entries(
+    db: &DbConn,
+    user_id: i32,
+    pagination: PaginationRequest,
+) -> Result<PaginationResponse<EntryDto>> {
+    pagination.validate().map_err(|_| {
+        Error::InvalidRequest("Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string())
+    })?;
+
+    let entry_pages = Entry::find()
+        .filter(EntryColumn::UserId.eq(user_id))
+        .filter(EntryColumn::DeletedAt.is_null())
+        .order_by_desc(EntryColumn::CreatedAt)
+        .paginate(db, pagination.per_page);
+
+    let entries = entry_pages
+        .fetch_page(pagination.page)
+        .await
+        .map_err(|_| Error::InternalError("Girdiler getirilemedi.".to_string()))?;
+
+    let user_nickname = User::find()
+        .filter(UserColumn::Id.eq(user_id))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
+        .and_then(|user| user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string())))?
+        .nickname;
+
+    let entry_dto_futures = entries.into_iter().map(|entry| {
+        let db = db.clone();
+        let user_nickname = user_nickname.clone();
+        async move {
+            let title_name = Title::find()
+                .filter(TitleColumn::Id.eq(entry.title_id))
+                .one(&db)
+                .await
+                .map_err(|_| Error::InternalError("Başlık adı getirilemedi.".to_string()))
+                .and_then(|title| {
+                    title.ok_or(Error::NotFound("Başlık adı getirilemedi.".to_string()))
+                })?
+                .name;
+
+            Ok(EntryDto {
+                id: entry.id,
+                title_id: entry.title_id,
+                title: title_name,
+                content: entry.content,
+                user_id: entry.user_id,
+                user_nickname,
+                created_at: entry.created_at.to_string(),
+                updated_at: entry.updated_at.to_string(),
+            })
+        }
+    });
+
+    let entry_dtos: Result<Vec<EntryDto>> = futures::future::join_all(entry_dto_futures)
+        .await
+        .into_iter()
+        .collect();
+
+    let entry_dtos =
+        entry_dtos.map_err(|_| Error::InternalError("Girdi DTO'ları getirilemedi.".to_string()))?;
+
+    let total = Entry::find()
+        .filter(EntryColumn::UserId.eq(user_id))
         .filter(EntryColumn::DeletedAt.is_null())
         .count(db)
         .await

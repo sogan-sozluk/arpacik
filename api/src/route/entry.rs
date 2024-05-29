@@ -89,3 +89,21 @@ pub async fn get_title_entries(
         }
     }
 }
+
+pub async fn get_user_entries(
+    state: State<AppState>,
+    Path(user_id): Path<i32>,
+    pagination: Query<PaginationRequest>,
+) -> Result<Json<PaginationResponse<EntryDto>>, (StatusCode, Json<ErrorResponse>)> {
+    let pagination = pagination.0;
+    match service::entry::get_user_entries(&state.conn, user_id, pagination).await {
+        Ok(entries) => Ok(Json(entries)),
+        Err(e) => {
+            let error_response = e.into_error_response();
+            Err((
+                StatusCode::from_u16(error_response.code).unwrap(),
+                Json(error_response),
+            ))
+        }
+    }
+}

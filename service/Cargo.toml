@@ -8,6 +8,7 @@ argon2 = "0.5.3"
 blake3 = "1.5.1"
 chrono = "0.4.38"
 entity = { path = "../entity" }
+futures = "0.3.30"
 jsonwebtoken = "9.3.0"
 serde = { version = "1.0.197", features = ["derive"] }
 thiserror = "1.0.61"

@@ -17,6 +17,7 @@ pub fn build(state: AppState) -> Router {
         .route_layer(middleware::from_fn(crate::middleware::auth::auth))
         .route("/hello", get(hello::hello_world))
         .route("/entries/:id", get(entry::get_entry))
+        .route("/users/:id/entries", get(entry::get_user_entries))
         .route("/titles/:id/entries", get(entry::get_title_entries))
         .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login))
