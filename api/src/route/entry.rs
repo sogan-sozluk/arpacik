@@ -1,10 +1,10 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     Json,
 };
 use service::{
-    dto::entry::CreateEntryRequest,
+    dto::{entry::CreateEntryRequest, pagination::PaginationRequest},
     error::{ErrorResponse, IntoErrorResponse},
     Error,
 };
@@ -43,6 +43,40 @@ pub async fn delete_entry(
     ))?;
     match service::entry::delete_entry(&state.conn, id, &cookie).await {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => {
+            let error_response = e.into_error_response();
+            Err((
+                StatusCode::from_u16(error_response.code).unwrap(),
+                Json(error_response),
+            ))
+        }
+    }
+}
+
+pub async fn get_entry(
+    state: State<AppState>,
+    Path(id): Path<i32>,
+) -> Result<Json<service::dto::entry::EntryDto>, (StatusCode, Json<ErrorResponse>)> {
+    match service::entry::get_entry(&state.conn, id).await {
+        Ok(entry) => Ok(Json(entry)),
+        Err(e) => {
+            let error_response = e.into_error_response();
+            Err((
+                StatusCode::from_u16(error_response.code).unwrap(),
+                Json(error_response),
+            ))
+        }
+    }
+}
+
+pub async fn get_title_entries(
+    state: State<AppState>,
+    Path(title_id): Path<i32>,
+    pagination: Query<PaginationRequest>,
+) -> Result<Json<Vec<service::dto::entry::EntryDto>>, (StatusCode, Json<ErrorResponse>)> {
+    let pagination = pagination.0;
+    match service::entry::get_title_entries(&state.conn, title_id, pagination).await {
+        Ok(entries) => Ok(Json(entries)),
         Err(e) => {
             let error_response = e.into_error_response();
             Err((
