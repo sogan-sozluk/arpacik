@@ -22,6 +22,8 @@ pub enum Error {
     InvalidToken,
     #[error("Kimlik doğrulama hatası: {0}")]
     Unauthorized(String),
+    #[error("{0}")]
+    NotFound(String),
 }
 
 pub trait IntoErrorResponse {
@@ -54,6 +56,11 @@ impl IntoErrorResponse for Error {
             Error::Unauthorized(e) => ErrorResponse {
                 code: 401,
                 error: e.split(':').next().unwrap().to_string(),
+                details: Some(e.to_string()),
+            },
+            Error::NotFound(e) => ErrorResponse {
+                code: 404,
+                error: "Bulunamadı".to_string(),
                 details: Some(e.to_string()),
             },
         }

@@ -7,6 +7,7 @@ pub async fn user_by_token(db: &DbConn, token: &str) -> Result<UserModel> {
 
     let user_id = Token::find()
         .filter(TokenColumn::Hash.eq(token_hash))
+        .filter(TokenColumn::InvalidatedAt.is_null())
         .one(db)
         .await
         .map_err(|_| Error::InvalidToken)
