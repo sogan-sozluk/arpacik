@@ -1,6 +1,9 @@
 use crate::{
     cookie::extract_cookie_value,
-    dto::{entry::EntryDto, pagination::PaginationRequest},
+    dto::{
+        entry::EntryDto,
+        pagination::{PaginationRequest, PaginationResponse},
+    },
     title::{create_title, title_id_by_name},
     user::user_by_token,
     Error, Result,
@@ -116,7 +119,7 @@ pub async fn get_title_entries(
     db: &DbConn,
     title_id: i32,
     pagination: PaginationRequest,
-) -> Result<Vec<EntryDto>> {
+) -> Result<PaginationResponse<EntryDto>> {
     pagination.validate().map_err(|_| {
         Error::InvalidRequest("Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string())
     })?;
@@ -146,5 +149,17 @@ pub async fn get_title_entries(
         });
     });
 
-    Ok(entry_dtos)
+    let total = Entry::find()
+        .filter(EntryColumn::TitleId.eq(title_id))
+        .filter(EntryColumn::DeletedAt.is_null())
+        .count(db)
+        .await
+        .map_err(|_| Error::InternalError("Girdi sayısı getirilemedi.".to_string()))?;
+
+    Ok(PaginationResponse {
+        total,
+        page: pagination.page,
+        per_page: pagination.per_page,
+        data: entry_dtos,
+    })
 }

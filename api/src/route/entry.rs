@@ -4,7 +4,10 @@ use axum::{
     Json,
 };
 use service::{
-    dto::{entry::CreateEntryRequest, pagination::PaginationRequest},
+    dto::{
+        entry::{CreateEntryRequest, EntryDto},
+        pagination::{PaginationRequest, PaginationResponse},
+    },
     error::{ErrorResponse, IntoErrorResponse},
     Error,
 };
@@ -73,7 +76,7 @@ pub async fn get_title_entries(
     state: State<AppState>,
     Path(title_id): Path<i32>,
     pagination: Query<PaginationRequest>,
-) -> Result<Json<Vec<service::dto::entry::EntryDto>>, (StatusCode, Json<ErrorResponse>)> {
+) -> Result<Json<PaginationResponse<EntryDto>>, (StatusCode, Json<ErrorResponse>)> {
     let pagination = pagination.0;
     match service::entry::get_title_entries(&state.conn, title_id, pagination).await {
         Ok(entries) => Ok(Json(entries)),
