@@ -1,8 +1,8 @@
 use crate::{
     cookie::extract_cookie_value,
-    error::{Error, Result},
     title::{create_title, title_id_by_name},
     user::user_by_token,
+    Error, Result,
 };
 use ::entity::prelude::*;
 use sea_orm::*;

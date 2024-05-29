@@ -2,8 +2,8 @@ use std::env;
 
 use crate::cookie::{extract_cookie_value, Cookie};
 use crate::dto::auth::{LoginRequest, RegisterRequest};
-use crate::error::{Error, Result};
 use crate::token::UserClaims;
+use crate::{Error, Result};
 use ::entity::prelude::*;
 use argon2::PasswordVerifier;
 use argon2::{

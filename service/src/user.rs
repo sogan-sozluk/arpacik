@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::{Error, Result};
 use ::entity::prelude::*;
 use sea_orm::*;
 
