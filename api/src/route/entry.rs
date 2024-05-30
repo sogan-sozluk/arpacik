@@ -8,7 +8,7 @@ use service::{
         entry::{CreateEntryRequest, EntryDto},
         pagination::{PaginationRequest, PaginationResponse},
     },
-    entry::{Author, Deleted},
+    entry::{Author, Deleted, TitleVisible},
     error::{ErrorResponse, IntoErrorResponse},
     Error,
 };
@@ -105,7 +105,15 @@ pub async fn get_user_entries(
     pagination: Query<PaginationRequest>,
 ) -> Result<Json<PaginationResponse<EntryDto>>, (StatusCode, Json<ErrorResponse>)> {
     let pagination = pagination.0;
-    match service::entry::get_user_entries(&state.conn, user_id, pagination).await {
+    match service::entry::get_user_entries(
+        &state.conn,
+        user_id,
+        pagination,
+        Some(Deleted::None),
+        Some(TitleVisible::Only),
+    )
+    .await
+    {
         Ok(entries) => Ok(Json(entries)),
         Err(e) => {
             let error_response = e.into_error_response();
