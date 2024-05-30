@@ -14,6 +14,17 @@ use validator::Validate;
 
 use crate::dto::entry::CreateEntryRequest;
 
+pub enum Deleted {
+    Only,
+    None,
+}
+
+#[derive(Clone)]
+pub enum Author {
+    Only,
+    None,
+}
+
 pub async fn create_entry(db: &DbConn, request: CreateEntryRequest, cookie: &str) -> Result<()> {
     request.validate().map_err(|_| {
         Error::InvalidRequest("Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string())
@@ -119,6 +130,8 @@ pub async fn get_title_entries(
     db: &DbConn,
     title_id: i32,
     pagination: PaginationRequest,
+    deleted: Option<Deleted>,
+    author: Option<Author>,
 ) -> Result<PaginationResponse<EntryDto>> {
     pagination.validate().map_err(|_| {
         Error::InvalidRequest("Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string())
@@ -126,7 +139,11 @@ pub async fn get_title_entries(
 
     let entry_pages = Entry::find()
         .filter(EntryColumn::TitleId.eq(title_id))
-        .filter(EntryColumn::DeletedAt.is_null())
+        .apply_if(Some(&deleted), |query, v| match v {
+            Some(Deleted::Only) => query.filter(EntryColumn::DeletedAt.is_not_null()),
+            Some(Deleted::None) => query.filter(EntryColumn::DeletedAt.is_null()),
+            None => query,
+        })
         .order_by_asc(EntryColumn::CreatedAt)
         .paginate(db, pagination.per_page);
 
@@ -146,39 +163,56 @@ pub async fn get_title_entries(
     let entry_dto_futures = entries.into_iter().map(|entry| {
         let db = db.clone();
         let title_name = title_name.clone();
-        async move {
-            let user_nickname = User::find()
-                .filter(UserColumn::Id.eq(entry.user_id))
-                .one(&db)
-                .await
-                .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
-                .and_then(|user| user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string())))?
-                .nickname;
+        let author = author.clone();
 
-            Ok(EntryDto {
-                id: entry.id,
-                title_id: entry.title_id,
-                title: title_name,
-                content: entry.content,
-                user_id: entry.user_id,
-                user_nickname,
-                created_at: entry.created_at.to_string(),
-                updated_at: entry.updated_at.to_string(),
-            })
+        async move {
+            let user = User::find()
+                .filter(UserColumn::Id.eq(entry.user_id))
+                .apply_if(Some(&author), |query, v| match v {
+                    Some(Author::Only) => query.filter(UserColumn::IsAuthor.eq(true)),
+                    Some(Author::None) => query.filter(UserColumn::IsAuthor.eq(false)),
+                    None => query,
+                })
+                .one(&db)
+                .await;
+
+            if let Ok(Some(user)) = user {
+                Ok(Some(EntryDto {
+                    id: entry.id,
+                    title_id: entry.title_id,
+                    title: title_name,
+                    content: entry.content,
+                    user_id: entry.user_id,
+                    user_nickname: user.nickname,
+                    created_at: entry.created_at.to_string(),
+                    updated_at: entry.updated_at.to_string(),
+                }))
+            } else {
+                Ok(None)
+            }
         }
     });
 
-    let entry_dtos: Result<Vec<EntryDto>> = futures::future::join_all(entry_dto_futures)
+    let entry_dtos: Result<Vec<Option<EntryDto>>> = futures::future::join_all(entry_dto_futures)
         .await
         .into_iter()
         .collect();
 
-    let entry_dtos =
-        entry_dtos.map_err(|_| Error::InternalError("Girdi DTO'ları getirilemedi.".to_string()))?;
+    let entry_dtos: Vec<EntryDto> = entry_dtos?.into_iter().flatten().collect();
 
     let total = Entry::find()
         .filter(EntryColumn::TitleId.eq(title_id))
-        .filter(EntryColumn::DeletedAt.is_null())
+        .apply_if(Some(&deleted), |query, v| match v {
+            Some(Deleted::Only) => query.filter(EntryColumn::DeletedAt.is_not_null()),
+            Some(Deleted::None) => query.filter(EntryColumn::DeletedAt.is_null()),
+            None => query,
+        })
+        .inner_join(User)
+        .apply_if(Some(&author), |query, v| match v {
+            Some(Author::Only) => query.filter(UserColumn::IsAuthor.eq(true)),
+            Some(Author::None) => query.filter(UserColumn::IsAuthor.eq(false)),
+            None => query,
+        })
         .count(db)
         .await
         .map_err(|_| Error::InternalError("Girdi sayısı getirilemedi.".to_string()))?;
