@@ -1,7 +1,7 @@
 use crate::{
     cookie::extract_cookie_value,
     dto::{
-        entry::EntryDto,
+        entry::{EntryDto, UpdateEntryRequest},
         pagination::{PaginationRequest, PaginationResponse},
     },
     title::{create_title, title_id_by_name},
@@ -32,7 +32,7 @@ pub enum TitleVisible {
     None,
 }
 
-pub async fn create_entry(db: &DbConn, request: CreateEntryRequest, cookie: &str) -> Result<()> {
+pub async fn create_entry(db: &DbConn, cookie: &str, request: CreateEntryRequest) -> Result<()> {
     request.validate().map_err(|_| {
         Error::InvalidRequest("Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string())
     })?;
@@ -70,7 +70,7 @@ pub async fn create_entry(db: &DbConn, request: CreateEntryRequest, cookie: &str
     Ok(())
 }
 
-pub async fn delete_entry(db: &DbConn, id: i32, cookie: &str) -> Result<()> {
+pub async fn delete_entry(db: &DbConn, cookie: &str, id: i32, soft_delete: bool) -> Result<()> {
     let token = extract_cookie_value(cookie, "token")
         .ok_or_else(|| Error::Unauthorized("Yetkisiz istek.".to_string()))?;
 
@@ -78,13 +78,26 @@ pub async fn delete_entry(db: &DbConn, id: i32, cookie: &str) -> Result<()> {
 
     let entry = Entry::find()
         .filter(EntryColumn::Id.eq(id))
+        .filter(EntryColumn::DeletedAt.is_null())
+        .apply_if(Some(!user.is_admin && !user.is_moderator), |query, v| {
+            if v {
+                query.filter(EntryColumn::UserId.eq(user.id))
+            } else {
+                query
+            }
+        })
         .one(db)
         .await
         .map_err(|_| Error::InternalError("Girdi bulunamadı.".to_string()))
         .and_then(|entry| entry.ok_or(Error::NotFound("Girdi bulunamadı.".to_string())))?;
 
-    if entry.user_id != user.id && !user.is_admin && !user.is_moderator {
-        return Err(Error::Unauthorized("Yetkisiz istek.".to_string()));
+    if !soft_delete {
+        entry
+            .delete(db)
+            .await
+            .map_err(|_| Error::InternalError("Girdi silinemedi.".to_string()))?;
+
+        return Ok(());
     }
 
     let mut entry: EntryActiveModel = entry.into();
@@ -94,6 +107,38 @@ pub async fn delete_entry(db: &DbConn, id: i32, cookie: &str) -> Result<()> {
         .save(db)
         .await
         .map_err(|_| Error::InternalError("Girdi silinemedi.".to_string()))?;
+
+    Ok(())
+}
+
+pub async fn recover_entry(db: &DbConn, cookie: &str, id: i32) -> Result<()> {
+    let token = extract_cookie_value(cookie, "token")
+        .ok_or_else(|| Error::Unauthorized("Yetkisi istek.".to_string()))?;
+
+    let user = user_by_token(db, token).await?;
+
+    let entry = Entry::find()
+        .filter(EntryColumn::Id.eq(id))
+        .filter(EntryColumn::DeletedAt.is_not_null())
+        .apply_if(Some(!user.is_admin && !user.is_moderator), |query, v| {
+            if v {
+                query.filter(EntryColumn::UserId.eq(user.id))
+            } else {
+                query
+            }
+        })
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Girdi bulunamadı.".to_string()))
+        .and_then(|entry| entry.ok_or(Error::NotFound("Girdi bulunamadı.".to_string())))?;
+
+    let mut entry: EntryActiveModel = entry.into();
+    entry.deleted_at = Set(None);
+
+    entry
+        .save(db)
+        .await
+        .map_err(|_| Error::InternalError("Girdi geri alınamadı.".to_string()))?;
 
     Ok(())
 }
@@ -131,6 +176,83 @@ pub async fn get_entry(db: &DbConn, id: i32) -> Result<EntryDto> {
         created_at: entry.created_at.to_string(),
         updated_at: entry.updated_at.to_string(),
     })
+}
+
+pub async fn update_entry(
+    db: &DbConn,
+    cookie: &str,
+    id: i32,
+    request: UpdateEntryRequest,
+) -> Result<()> {
+    request.validate().map_err(|_| {
+        Error::InvalidRequest("Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string())
+    })?;
+
+    let token = extract_cookie_value(cookie, "token")
+        .ok_or_else(|| Error::Unauthorized("Yetkisiz istek.".to_string()))?;
+
+    let user = user_by_token(db, token).await?;
+
+    let entry = Entry::find()
+        .filter(EntryColumn::Id.eq(id))
+        .filter(EntryColumn::DeletedAt.is_null())
+        .apply_if(Some(!user.is_admin && !user.is_moderator), |query, v| {
+            if v {
+                query.filter(EntryColumn::UserId.eq(user.id))
+            } else {
+                query
+            }
+        })
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Girdi bulunamadı.".to_string()))
+        .and_then(|entry| entry.ok_or(Error::NotFound("Girdi bulunamadı.".to_string())))?;
+
+    let mut entry: EntryActiveModel = entry.into();
+    entry.content = Set(request.content);
+    entry.updated_at = Set(chrono::Utc::now().naive_utc());
+
+    entry
+        .save(db)
+        .await
+        .map_err(|_| Error::InternalError("Girdi güncellenemedi.".to_string()))?;
+
+    Ok(())
+}
+
+pub async fn migrate_entry(db: &DbConn, cookie: &str, id: i32, title_id: i32) -> Result<()> {
+    let token = extract_cookie_value(cookie, "token")
+        .ok_or_else(|| Error::Unauthorized("Yetkisi istek.".to_string()))?;
+
+    let user = user_by_token(db, token).await?;
+    if !user.is_admin && !user.is_moderator {
+        return Err(Error::Unauthorized("Yetkisiz istek.".to_string()));
+    }
+
+    let entry = Entry::find()
+        .filter(EntryColumn::Id.eq(id))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Girdi bulunamadı.".to_string()))
+        .and_then(|entry| entry.ok_or(Error::NotFound("Girdi bulunamadı.".to_string())))?;
+
+    // TODO: Use exists instead of find
+    Title::find()
+        .filter(TitleColumn::Id.eq(title_id))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Başlık bulunamadı.".to_string()))
+        .and_then(|title| title.ok_or(Error::NotFound("Başlık bulunamadı.".to_string())))?;
+
+    let mut entry: EntryActiveModel = entry.into();
+    entry.title_id = Set(title_id);
+
+    entry
+        .save(db)
+        .await
+        .map_err(|_| Error::InternalError("Girdi taşınamadı.".to_string()))?;
+
+    Ok(())
 }
 
 pub async fn get_title_entries(

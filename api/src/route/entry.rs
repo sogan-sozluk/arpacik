@@ -5,7 +5,7 @@ use axum::{
 };
 use service::{
     dto::{
-        entry::{CreateEntryRequest, EntryDto},
+        entry::{CreateEntryRequest, EntryDto, UpdateEntryRequest},
         pagination::{PaginationRequest, PaginationResponse},
     },
     entry::{Author, Deleted, TitleVisible},
@@ -24,7 +24,7 @@ pub async fn create_entry(
         StatusCode::UNAUTHORIZED,
         Json(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response()),
     ))?;
-    match service::entry::create_entry(&state.conn, json_data.0, &cookie).await {
+    match service::entry::create_entry(&state.conn, &cookie, json_data.0).await {
         Ok(_) => Ok(StatusCode::CREATED),
         Err(e) => {
             let error_response = e.into_error_response();
@@ -45,7 +45,49 @@ pub async fn delete_entry(
         StatusCode::UNAUTHORIZED,
         Json(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response()),
     ))?;
-    match service::entry::delete_entry(&state.conn, id, &cookie).await {
+    match service::entry::delete_entry(&state.conn, &cookie, id, false).await {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => {
+            let error_response = e.into_error_response();
+            Err((
+                StatusCode::from_u16(error_response.code).unwrap(),
+                Json(error_response),
+            ))
+        }
+    }
+}
+
+pub async fn soft_delete_entry(
+    state: State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<i32>,
+) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
+    let cookie = get_cookie(&headers).ok_or((
+        StatusCode::UNAUTHORIZED,
+        Json(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response()),
+    ))?;
+    match service::entry::delete_entry(&state.conn, &cookie, id, true).await {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => {
+            let error_response = e.into_error_response();
+            Err((
+                StatusCode::from_u16(error_response.code).unwrap(),
+                Json(error_response),
+            ))
+        }
+    }
+}
+
+pub async fn recover_entry(
+    state: State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<i32>,
+) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
+    let cookie = get_cookie(&headers).ok_or((
+        StatusCode::UNAUTHORIZED,
+        Json(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response()),
+    ))?;
+    match service::entry::recover_entry(&state.conn, &cookie, id).await {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
         Err(e) => {
             let error_response = e.into_error_response();
@@ -83,7 +125,7 @@ pub async fn get_title_entries(
         &state.conn,
         title_id,
         pagination,
-        Some(Deleted::Only),
+        Some(Deleted::None),
         Some(Author::Only),
     )
     .await
@@ -115,6 +157,49 @@ pub async fn get_user_entries(
     .await
     {
         Ok(entries) => Ok(Json(entries)),
+        Err(e) => {
+            let error_response = e.into_error_response();
+            Err((
+                StatusCode::from_u16(error_response.code).unwrap(),
+                Json(error_response),
+            ))
+        }
+    }
+}
+
+pub async fn update_entry(
+    state: State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<i32>,
+    json_data: Json<UpdateEntryRequest>,
+) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
+    let cookie = get_cookie(&headers).ok_or((
+        StatusCode::UNAUTHORIZED,
+        Json(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response()),
+    ))?;
+    match service::entry::update_entry(&state.conn, &cookie, id, json_data.0).await {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => {
+            let error_response = e.into_error_response();
+            Err((
+                StatusCode::from_u16(error_response.code).unwrap(),
+                Json(error_response),
+            ))
+        }
+    }
+}
+
+pub async fn migrate_entry(
+    state: State<AppState>,
+    headers: HeaderMap,
+    Path((id, title_id)): Path<(i32, i32)>,
+) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
+    let cookie = get_cookie(&headers).ok_or((
+        StatusCode::UNAUTHORIZED,
+        Json(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response()),
+    ))?;
+    match service::entry::migrate_entry(&state.conn, &cookie, id, title_id).await {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
         Err(e) => {
             let error_response = e.into_error_response();
             Err((

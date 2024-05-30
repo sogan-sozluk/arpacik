@@ -1,7 +1,7 @@
 use crate::AppState;
 use axum::{
     middleware,
-    routing::{delete, get, post},
+    routing::{delete, get, patch, post},
     Router,
 };
 
@@ -14,6 +14,13 @@ pub fn build(state: AppState) -> Router {
         .route("/auth/logout", post(auth::logout))
         .route("/entries", post(entry::create_entry))
         .route("/entries/:id", delete(entry::delete_entry))
+        .route("/entries/:id/recover", patch(entry::recover_entry))
+        .route("/entries/:id/soft-delete", delete(entry::soft_delete_entry))
+        .route("/entries/:id", patch(entry::update_entry))
+        .route(
+            "/entries/:id/to-title/:title_id",
+            patch(entry::migrate_entry),
+        )
         .route_layer(middleware::from_fn(crate::middleware::auth::auth))
         .route("/hello", get(hello::hello_world))
         .route("/entries/:id", get(entry::get_entry))
