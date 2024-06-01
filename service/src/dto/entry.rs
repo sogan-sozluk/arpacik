@@ -5,7 +5,6 @@ use crate::{Author, Deleted, TitleVisible};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EntryDto {
-    // TODO: Add `is_author_entry`
     // TODO: Add `is_title_visible`
     pub id: i32,
     pub title_id: i32,
@@ -13,6 +12,7 @@ pub struct EntryDto {
     pub content: String,
     pub user_id: i32,
     pub user_nickname: String,
+    pub is_author_entry: bool,
     pub created_at: String,
     pub updated_at: String,
 }

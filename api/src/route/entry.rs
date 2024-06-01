@@ -123,7 +123,6 @@ pub async fn get_title_entries(
     Path(title_id): Path<i32>,
     filter: Query<GetTitleEntriesFilter>,
 ) -> Result<Json<PaginationResponse<EntryDto>>, (StatusCode, Json<ErrorResponse>)> {
-    // iif get cookie returns None, set cookie to empty string
     let cookie = get_cookie(&headers);
     match service::entry::get_title_entries(&state.conn, cookie.as_deref(), title_id, filter.0)
         .await
@@ -141,10 +140,13 @@ pub async fn get_title_entries(
 
 pub async fn get_user_entries(
     state: State<AppState>,
+    headers: HeaderMap,
     Path(user_id): Path<i32>,
     filter: Query<GetUserEntriesFilter>,
 ) -> Result<Json<PaginationResponse<EntryDto>>, (StatusCode, Json<ErrorResponse>)> {
-    match service::entry::get_user_entries(&state.conn, user_id, filter.0).await {
+    let cookie = get_cookie(&headers);
+    match service::entry::get_user_entries(&state.conn, cookie.as_deref(), user_id, filter.0).await
+    {
         Ok(entries) => Ok(Json(entries)),
         Err(e) => {
             let error_response = e.into_error_response();

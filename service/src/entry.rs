@@ -12,7 +12,7 @@ use crate::{
         pagination::PaginationResponse,
     },
     title::{create_title, title_id_by_name},
-    token::{is_admin, is_moderator},
+    token::{get_id, is_admin, is_moderator},
     user::user_by_token,
     Author, Deleted, Error, Result, TitleVisible,
 };
@@ -158,6 +158,7 @@ pub async fn get_entry(db: &DbConn, id: i32) -> Result<EntryDto> {
         content: entry.content,
         user_id: user.id,
         user_nickname: user.nickname,
+        is_author_entry: user.is_author,
         created_at: entry.created_at.to_string(),
         updated_at: entry.updated_at.to_string(),
     })
@@ -326,6 +327,7 @@ pub async fn get_title_entries(
                     content: entry.content,
                     user_id: entry.user_id,
                     user_nickname: user.nickname,
+                    is_author_entry: user.is_author,
                     created_at: entry.created_at.to_string(),
                     updated_at: entry.updated_at.to_string(),
                 }))
@@ -369,12 +371,59 @@ pub async fn get_title_entries(
 
 pub async fn get_user_entries(
     db: &DbConn,
+    cookie: Option<&str>,
     user_id: i32,
     filter: GetUserEntriesFilter,
 ) -> Result<PaginationResponse<EntryDto>> {
     filter.validate().map_err(|_| {
         Error::InvalidRequest("Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string())
     })?;
+
+    let key = match std::env::var("JWT_SECRET") {
+        Ok(key) => key,
+        Err(_) => return Err(Error::InternalError("JWT anahtarı bulunamadı.".to_string())),
+    };
+
+    let token = match cookie {
+        Some(cookie) => extract_cookie_value(cookie, "token"),
+        None => None,
+    };
+
+    let is_admin_or_moderator = match token {
+        Some(token) => is_admin(token, &key) || is_moderator(token, &key),
+        None => false,
+    };
+
+    let self_user_id = match token {
+        Some(token) => get_id(token, &key),
+        None => None,
+    };
+
+    match filter.deleted {
+        None | Some(Deleted::Only)
+            if !is_admin_or_moderator && self_user_id.is_none()
+                || !is_admin_or_moderator
+                    && self_user_id.is_some()
+                    && user_id != self_user_id.unwrap() =>
+        {
+            return Err(Error::Unauthorized("Yetkisiz istek.".to_string()));
+        }
+        _ => {}
+    }
+
+    match filter.title_visible {
+        Some(TitleVisible::None) | None if !is_admin_or_moderator => {
+            return Err(Error::Unauthorized("Yetkisiz istek.".to_string()));
+        }
+        _ => {}
+    }
+
+    let user = User::find()
+        .filter(UserColumn::Id.eq(user_id))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
+        .and_then(|user| user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string())))?;
 
     let entry_pages = Entry::find()
         .filter(EntryColumn::UserId.eq(user_id))
@@ -393,6 +442,8 @@ pub async fn get_user_entries(
 
     let entry_dto_futures = entries.into_iter().map(|entry| {
         let db = db.clone();
+        let user_nickname = user.nickname.clone();
+        let user_is_author = user.is_author;
 
         async move {
             let title = Title::find()
@@ -412,7 +463,8 @@ pub async fn get_user_entries(
                     title: title.name,
                     content: entry.content,
                     user_id: entry.user_id,
-                    user_nickname: "".to_string(),
+                    user_nickname,
+                    is_author_entry: user_is_author,
                     created_at: entry.created_at.to_string(),
                     updated_at: entry.updated_at.to_string(),
                 }))
