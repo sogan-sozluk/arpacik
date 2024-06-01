@@ -51,6 +51,15 @@ pub fn get_field_from_token(token: &str, field: TokenField, key: &str) -> Option
     }
 }
 
+pub fn get_id(token: &str, key: &str) -> Option<i32> {
+    let id = get_field_from_token(token, TokenField::Id, key);
+
+    match id {
+        Some(id) => id.parse::<i32>().ok(),
+        None => None,
+    }
+}
+
 pub fn is_admin(token: &str, key: &str) -> bool {
     let is_admin = get_field_from_token(token, TokenField::IsAdmin, key);
 
