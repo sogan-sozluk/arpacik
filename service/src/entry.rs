@@ -1,36 +1,21 @@
-use crate::{
-    cookie::extract_cookie_value,
-    dto::{
-        entry::{EntryDto, UpdateEntryRequest},
-        pagination::{PaginationRequest, PaginationResponse},
-    },
-    title::{create_title, title_id_by_name},
-    user::user_by_token,
-    Error, Result,
-};
 use ::entity::prelude::*;
 use sea_orm::*;
 use validator::Validate;
 
-use crate::dto::entry::CreateEntryRequest;
-
-#[derive(Clone)]
-pub enum Deleted {
-    Only,
-    None,
-}
-
-#[derive(Clone)]
-pub enum Author {
-    Only,
-    None,
-}
-
-#[derive(Clone)]
-pub enum TitleVisible {
-    Only,
-    None,
-}
+use crate::{
+    cookie::extract_cookie_value,
+    dto::{
+        entry::{
+            CreateEntryRequest, EntryDto, GetTitleEntriesFilter, GetUserEntriesFilter,
+            UpdateEntryRequest,
+        },
+        pagination::PaginationResponse,
+    },
+    title::{create_title, title_id_by_name},
+    token::{is_admin, is_moderator},
+    user::user_by_token,
+    Author, Deleted, Error, Result, TitleVisible,
+};
 
 pub async fn create_entry(db: &DbConn, cookie: &str, request: CreateEntryRequest) -> Result<()> {
     request.validate().map_err(|_| {
@@ -257,32 +242,61 @@ pub async fn migrate_entry(db: &DbConn, cookie: &str, id: i32, title_id: i32) ->
 
 pub async fn get_title_entries(
     db: &DbConn,
+    cookie: Option<&str>,
     title_id: i32,
-    pagination: PaginationRequest,
-    deleted: Option<Deleted>,
-    author: Option<Author>,
+    filter: GetTitleEntriesFilter,
 ) -> Result<PaginationResponse<EntryDto>> {
-    pagination.validate().map_err(|_| {
+    filter.validate().map_err(|_| {
         Error::InvalidRequest("Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string())
     })?;
 
+    // TODO: Stop getting the key from the environment variable again and again
+    let key = match std::env::var("JWT_SECRET") {
+        Ok(key) => key,
+        Err(_) => return Err(Error::InternalError("JWT anahtarı bulunamadı.".to_string())),
+    };
+
+    let token = match cookie {
+        Some(cookie) => extract_cookie_value(cookie, "token"),
+        None => None,
+    };
+
+    let is_admin_or_moderator = match token {
+        Some(token) => is_admin(token, &key) || is_moderator(token, &key),
+        None => false,
+    };
+
+    match filter.deleted {
+        None | Some(Deleted::Only) if !is_admin_or_moderator => {
+            return Err(Error::Unauthorized("Yetkisiz istek.".to_string()));
+        }
+        _ => {}
+    }
+
     let entry_pages = Entry::find()
         .filter(EntryColumn::TitleId.eq(title_id))
-        .apply_if(Some(&deleted), |query, v| match v {
+        .apply_if(Some(&filter.deleted), |query, v| match v {
             Some(Deleted::Only) => query.filter(EntryColumn::DeletedAt.is_not_null()),
             Some(Deleted::None) => query.filter(EntryColumn::DeletedAt.is_null()),
             None => query,
         })
         .order_by_asc(EntryColumn::CreatedAt)
-        .paginate(db, pagination.per_page);
+        .paginate(db, filter.per_page.into());
 
     let entries = entry_pages
-        .fetch_page(pagination.page)
+        .fetch_page(filter.page.into())
         .await
         .map_err(|_| Error::InternalError("Girdiler getirilemedi.".to_string()))?;
 
     let title_name = Title::find()
         .filter(TitleColumn::Id.eq(title_id))
+        .apply_if(Some(!is_admin_or_moderator), |query, v| {
+            if v {
+                query.filter(TitleColumn::IsVisible.eq(true))
+            } else {
+                query
+            }
+        })
         .one(db)
         .await
         .map_err(|_| Error::InternalError("Başlık adı getirilemedi.".to_string()))
@@ -292,12 +306,11 @@ pub async fn get_title_entries(
     let entry_dto_futures = entries.into_iter().map(|entry| {
         let db = db.clone();
         let title_name = title_name.clone();
-        let author = author.clone();
 
         async move {
             let user = User::find()
                 .filter(UserColumn::Id.eq(entry.user_id))
-                .apply_if(Some(&author), |query, v| match v {
+                .apply_if(Some(&filter.author), |query, v| match v {
                     Some(Author::Only) => query.filter(UserColumn::IsAuthor.eq(true)),
                     Some(Author::None) => query.filter(UserColumn::IsAuthor.eq(false)),
                     None => query,
@@ -331,13 +344,13 @@ pub async fn get_title_entries(
 
     let total = Entry::find()
         .filter(EntryColumn::TitleId.eq(title_id))
-        .apply_if(Some(&deleted), |query, v| match v {
+        .apply_if(Some(&filter.deleted), |query, v| match v {
             Some(Deleted::Only) => query.filter(EntryColumn::DeletedAt.is_not_null()),
             Some(Deleted::None) => query.filter(EntryColumn::DeletedAt.is_null()),
             None => query,
         })
         .inner_join(User)
-        .apply_if(Some(&author), |query, v| match v {
+        .apply_if(Some(&filter.author), |query, v| match v {
             Some(Author::Only) => query.filter(UserColumn::IsAuthor.eq(true)),
             Some(Author::None) => query.filter(UserColumn::IsAuthor.eq(false)),
             None => query,
@@ -348,8 +361,8 @@ pub async fn get_title_entries(
 
     Ok(PaginationResponse {
         total,
-        page: pagination.page,
-        per_page: pagination.per_page,
+        page: filter.page,
+        per_page: filter.per_page,
         data: entry_dtos,
     })
 }
@@ -357,37 +370,34 @@ pub async fn get_title_entries(
 pub async fn get_user_entries(
     db: &DbConn,
     user_id: i32,
-    pagination: PaginationRequest,
-    deleted: Option<Deleted>,
-    title_visible: Option<TitleVisible>,
+    filter: GetUserEntriesFilter,
 ) -> Result<PaginationResponse<EntryDto>> {
-    pagination.validate().map_err(|_| {
+    filter.validate().map_err(|_| {
         Error::InvalidRequest("Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string())
     })?;
 
     let entry_pages = Entry::find()
         .filter(EntryColumn::UserId.eq(user_id))
-        .apply_if(Some(&deleted), |query, v| match v {
+        .apply_if(Some(&filter.deleted), |query, v| match v {
             Some(Deleted::Only) => query.filter(EntryColumn::DeletedAt.is_not_null()),
             Some(Deleted::None) => query.filter(EntryColumn::DeletedAt.is_null()),
             None => query,
         })
         .order_by_asc(EntryColumn::CreatedAt)
-        .paginate(db, pagination.per_page);
+        .paginate(db, filter.per_page.into());
 
     let entries = entry_pages
-        .fetch_page(pagination.page)
+        .fetch_page(filter.page.into())
         .await
         .map_err(|_| Error::InternalError("Girdiler getirilemedi.".to_string()))?;
 
     let entry_dto_futures = entries.into_iter().map(|entry| {
         let db = db.clone();
-        let title_visible = title_visible.clone();
 
         async move {
             let title = Title::find()
                 .filter(TitleColumn::Id.eq(entry.title_id))
-                .apply_if(Some(&title_visible), |query, v| match v {
+                .apply_if(Some(&filter.title_visible), |query, v| match v {
                     Some(TitleVisible::Only) => query.filter(TitleColumn::IsVisible.eq(true)),
                     Some(TitleVisible::None) => query.filter(TitleColumn::IsVisible.eq(false)),
                     None => query,
@@ -421,13 +431,13 @@ pub async fn get_user_entries(
 
     let total = Entry::find()
         .filter(EntryColumn::UserId.eq(user_id))
-        .apply_if(Some(&deleted), |query, v| match v {
+        .apply_if(Some(&filter.deleted), |query, v| match v {
             Some(Deleted::Only) => query.filter(EntryColumn::DeletedAt.is_not_null()),
             Some(Deleted::None) => query.filter(EntryColumn::DeletedAt.is_null()),
             None => query,
         })
         .inner_join(Title)
-        .apply_if(Some(&title_visible), |query, v| match v {
+        .apply_if(Some(&filter.title_visible), |query, v| match v {
             Some(TitleVisible::Only) => query.filter(TitleColumn::IsVisible.eq(true)),
             Some(TitleVisible::None) => query.filter(TitleColumn::IsVisible.eq(false)),
             None => query,
@@ -438,8 +448,8 @@ pub async fn get_user_entries(
 
     Ok(PaginationResponse {
         total,
-        page: pagination.page,
-        per_page: pagination.per_page,
+        page: filter.page,
+        per_page: filter.per_page,
         data: entry_dtos,
     })
 }

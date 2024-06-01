@@ -1,8 +1,12 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
+use crate::{Author, Deleted, TitleVisible};
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EntryDto {
+    // TODO: Add `is_author_entry`
+    // TODO: Add `is_title_visible`
     pub id: i32,
     pub title_id: i32,
     pub title: String,
@@ -25,4 +29,24 @@ pub struct CreateEntryRequest {
 pub struct UpdateEntryRequest {
     #[validate(length(min = 1, max = 65535))]
     pub content: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Validate)]
+pub struct GetTitleEntriesFilter {
+    #[validate(range(min = 1, max = 100))]
+    pub per_page: u8,
+    #[validate(range(min = 0))]
+    pub page: u8,
+    pub deleted: Option<Deleted>,
+    pub author: Option<Author>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Validate)]
+pub struct GetUserEntriesFilter {
+    #[validate(range(min = 1, max = 100))]
+    pub per_page: u8,
+    #[validate(range(min = 0))]
+    pub page: u8,
+    pub deleted: Option<Deleted>,
+    pub title_visible: Option<TitleVisible>,
 }
