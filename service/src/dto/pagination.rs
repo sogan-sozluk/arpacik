@@ -12,7 +12,7 @@ pub struct PaginationRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PaginationResponse<T> {
     pub total: u64,
-    pub page: u64,
-    pub per_page: u64,
+    pub page: u8,
+    pub per_page: u8,
     pub data: Vec<T>,
 }

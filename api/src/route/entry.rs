@@ -5,10 +5,12 @@ use axum::{
 };
 use service::{
     dto::{
-        entry::{CreateEntryRequest, EntryDto, UpdateEntryRequest},
-        pagination::{PaginationRequest, PaginationResponse},
+        entry::{
+            CreateEntryRequest, EntryDto, GetTitleEntriesFilter, GetUserEntriesFilter,
+            UpdateEntryRequest,
+        },
+        pagination::PaginationResponse,
     },
-    entry::{Author, Deleted, TitleVisible},
     error::{ErrorResponse, IntoErrorResponse},
     Error,
 };
@@ -117,18 +119,14 @@ pub async fn get_entry(
 
 pub async fn get_title_entries(
     state: State<AppState>,
+    headers: HeaderMap,
     Path(title_id): Path<i32>,
-    pagination: Query<PaginationRequest>,
+    filter: Query<GetTitleEntriesFilter>,
 ) -> Result<Json<PaginationResponse<EntryDto>>, (StatusCode, Json<ErrorResponse>)> {
-    let pagination = pagination.0;
-    match service::entry::get_title_entries(
-        &state.conn,
-        title_id,
-        pagination,
-        Some(Deleted::None),
-        Some(Author::Only),
-    )
-    .await
+    // iif get cookie returns None, set cookie to empty string
+    let cookie = get_cookie(&headers);
+    match service::entry::get_title_entries(&state.conn, cookie.as_deref(), title_id, filter.0)
+        .await
     {
         Ok(entries) => Ok(Json(entries)),
         Err(e) => {
@@ -144,18 +142,9 @@ pub async fn get_title_entries(
 pub async fn get_user_entries(
     state: State<AppState>,
     Path(user_id): Path<i32>,
-    pagination: Query<PaginationRequest>,
+    filter: Query<GetUserEntriesFilter>,
 ) -> Result<Json<PaginationResponse<EntryDto>>, (StatusCode, Json<ErrorResponse>)> {
-    let pagination = pagination.0;
-    match service::entry::get_user_entries(
-        &state.conn,
-        user_id,
-        pagination,
-        Some(Deleted::None),
-        Some(TitleVisible::Only),
-    )
-    .await
-    {
+    match service::entry::get_user_entries(&state.conn, user_id, filter.0).await {
         Ok(entries) => Ok(Json(entries)),
         Err(e) => {
             let error_response = e.into_error_response();
