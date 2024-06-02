@@ -12,6 +12,8 @@ pub struct Model {
     pub title_id: i32,
     #[sea_orm(unique)]
     pub content: String,
+    pub net_votes: i32,
+    pub total_favorites: i32,
     pub created_at: DateTime,
     pub updated_at: DateTime,
     pub deleted_at: Option<DateTime>,

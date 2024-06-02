@@ -1,18 +1,28 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::{Author, Deleted, TitleVisible};
+use super::order::{Order, OrderBy};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EntryTitleDto {
+    pub id: i32,
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EntryAuthorDto {
+    pub id: i32,
+    pub nickname: String,
+    pub is_faded: bool,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EntryDto {
     // TODO: Add `is_title_visible`
     pub id: i32,
-    pub title_id: i32,
-    pub title: String,
+    pub title: EntryTitleDto,
     pub content: String,
-    pub user_id: i32,
-    pub user_nickname: String,
-    pub is_author_entry: bool,
+    pub author: EntryAuthorDto,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -32,21 +42,13 @@ pub struct UpdateEntryRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
-pub struct GetTitleEntriesFilter {
+pub struct GetTitleEntriesQuery {
     #[validate(range(min = 1, max = 100))]
     pub per_page: u8,
     #[validate(range(min = 0))]
     pub page: u8,
-    pub deleted: Option<Deleted>,
-    pub author: Option<Author>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Validate)]
-pub struct GetUserEntriesFilter {
-    #[validate(range(min = 1, max = 100))]
-    pub per_page: u8,
-    #[validate(range(min = 0))]
-    pub page: u8,
-    pub deleted: Option<Deleted>,
-    pub title_visible: Option<TitleVisible>,
+    pub from: Option<chrono::DateTime<chrono::Utc>>,
+    pub to: Option<chrono::DateTime<chrono::Utc>>,
+    pub order_by: Option<OrderBy>,
+    pub order: Option<Order>,
 }

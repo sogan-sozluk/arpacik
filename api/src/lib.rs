@@ -27,7 +27,9 @@ async fn start() -> anyhow::Result<()> {
         .expect("Database connection failed");
     Migrator::up(&conn, None).await.unwrap();
 
-    let state = AppState { conn };
+    let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET is not set in .env file");
+
+    let state = AppState { conn, jwt_secret };
     let router = route::build(state);
     let app = Router::new().nest("/", router);
     let listener = tokio::net::TcpListener::bind(&server_url).await.unwrap();
@@ -40,6 +42,7 @@ async fn start() -> anyhow::Result<()> {
 #[derive(Clone)]
 struct AppState {
     conn: DatabaseConnection,
+    jwt_secret: String,
 }
 
 pub fn main() {
