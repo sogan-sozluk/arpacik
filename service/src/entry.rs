@@ -29,13 +29,31 @@ pub async fn create_entry(db: &DbConn, cookie: &str, request: CreateEntryRequest
     let title_id = match title_id_by_name(db, &request.title).await {
         Some(title_id) => title_id,
         None => {
-            if user.is_faded {
+            if !user.is_faded {
                 create_title(db, &request.title).await?.id.unwrap()
             } else {
-                return Err(Error::InvalidRequest("Başlık bulunamadı.".to_string()));
+                return Err(Error::InvalidRequest(
+                    "Solgun kullanıcılar başlık oluşturamaz.".to_string(),
+                ));
             }
         }
     };
+    let title = Title::find()
+        .filter(TitleColumn::Name.eq(&request.title))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Başlık bulunamadı.".to_string()))?;
+
+    let mut title = match title {
+        Some(title) => title.into(),
+        None => create_title(db, &request.title).await?,
+    };
+
+    title.last_entry_at = Set(chrono::Utc::now().naive_utc());
+    title
+        .save(db)
+        .await
+        .map_err(|_| Error::InternalError("Başlık güncellenemedi.".to_string()))?;
 
     EntryActiveModel {
         title_id: Set(title_id),

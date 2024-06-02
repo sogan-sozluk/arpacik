@@ -4,6 +4,7 @@ pub mod dto;
 pub mod entry;
 pub mod error;
 pub mod title;
+pub mod today;
 pub mod token;
 pub mod user;
 pub mod validation;
