@@ -5,11 +5,8 @@ use axum::{
 };
 use service::{
     dto::{
-        entry::{
-            CreateEntryRequest, EntryDto, GetTitleEntriesFilter, GetUserEntriesFilter,
-            UpdateEntryRequest,
-        },
-        pagination::PaginationResponse,
+        entry::{CreateEntryRequest, EntryDto, GetTitleEntriesQuery, UpdateEntryRequest},
+        pagination::{PaginationQuery, PaginationResponse},
     },
     error::{ErrorResponse, IntoErrorResponse},
     Error,
@@ -119,14 +116,10 @@ pub async fn get_entry(
 
 pub async fn get_title_entries(
     state: State<AppState>,
-    headers: HeaderMap,
-    Path(title_id): Path<i32>,
-    filter: Query<GetTitleEntriesFilter>,
+    Path(id): Path<i32>,
+    query: Query<GetTitleEntriesQuery>,
 ) -> Result<Json<PaginationResponse<EntryDto>>, (StatusCode, Json<ErrorResponse>)> {
-    let cookie = get_cookie(&headers);
-    match service::entry::get_title_entries(&state.conn, cookie.as_deref(), title_id, filter.0)
-        .await
-    {
+    match service::entry::get_title_entries(&state.conn, id, query.0).await {
         Ok(entries) => Ok(Json(entries)),
         Err(e) => {
             let error_response = e.into_error_response();
@@ -140,13 +133,10 @@ pub async fn get_title_entries(
 
 pub async fn get_user_entries(
     state: State<AppState>,
-    headers: HeaderMap,
     Path(user_id): Path<i32>,
-    filter: Query<GetUserEntriesFilter>,
+    query: Query<PaginationQuery>,
 ) -> Result<Json<PaginationResponse<EntryDto>>, (StatusCode, Json<ErrorResponse>)> {
-    let cookie = get_cookie(&headers);
-    match service::entry::get_user_entries(&state.conn, cookie.as_deref(), user_id, filter.0).await
-    {
+    match service::entry::get_user_entries(&state.conn, user_id, query.0).await {
         Ok(entries) => Ok(Json(entries)),
         Err(e) => {
             let error_response = e.into_error_response();

@@ -6,15 +6,15 @@ use crate::{
     cookie::extract_cookie_value,
     dto::{
         entry::{
-            CreateEntryRequest, EntryDto, GetTitleEntriesFilter, GetUserEntriesFilter,
+            CreateEntryRequest, EntryAuthorDto, EntryDto, EntryTitleDto, GetTitleEntriesQuery,
             UpdateEntryRequest,
         },
-        pagination::PaginationResponse,
+        order::{self, OrderBy},
+        pagination::{PaginationQuery, PaginationResponse},
     },
     title::{create_title, title_id_by_name},
-    token::{get_id, is_admin, is_moderator},
     user::user_by_token,
-    Author, Deleted, Error, Result, TitleVisible,
+    Error, Result,
 };
 
 pub async fn create_entry(db: &DbConn, cookie: &str, request: CreateEntryRequest) -> Result<()> {
@@ -29,7 +29,7 @@ pub async fn create_entry(db: &DbConn, cookie: &str, request: CreateEntryRequest
     let title_id = match title_id_by_name(db, &request.title).await {
         Some(title_id) => title_id,
         None => {
-            if user.is_author {
+            if user.is_faded {
                 create_title(db, &request.title).await?.id.unwrap()
             } else {
                 return Err(Error::InvalidRequest("Başlık bulunamadı.".to_string()));
@@ -153,12 +153,16 @@ pub async fn get_entry(db: &DbConn, id: i32) -> Result<EntryDto> {
 
     Ok(EntryDto {
         id: entry.id,
-        title_id: title.id,
-        title: title.name,
+        title: EntryTitleDto {
+            id: title.id,
+            name: title.name,
+        },
         content: entry.content,
-        user_id: user.id,
-        user_nickname: user.nickname,
-        is_author_entry: user.is_author,
+        author: EntryAuthorDto {
+            id: user.id,
+            nickname: user.nickname,
+            is_faded: user.is_faded,
+        },
         created_at: entry.created_at.to_string(),
         updated_at: entry.updated_at.to_string(),
     })
@@ -243,66 +247,65 @@ pub async fn migrate_entry(db: &DbConn, cookie: &str, id: i32, title_id: i32) ->
 
 pub async fn get_title_entries(
     db: &DbConn,
-    cookie: Option<&str>,
-    title_id: i32,
-    filter: GetTitleEntriesFilter,
+    id: i32,
+    query: GetTitleEntriesQuery,
 ) -> Result<PaginationResponse<EntryDto>> {
-    filter.validate().map_err(|_| {
+    query.validate().map_err(|_| {
         Error::InvalidRequest("Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string())
     })?;
 
-    // TODO: Stop getting the key from the environment variable again and again
-    let key = match std::env::var("JWT_SECRET") {
-        Ok(key) => key,
-        Err(_) => return Err(Error::InternalError("JWT anahtarı bulunamadı.".to_string())),
-    };
-
-    let token = match cookie {
-        Some(cookie) => extract_cookie_value(cookie, "token"),
-        None => None,
-    };
-
-    let is_admin_or_moderator = match token {
-        Some(token) => is_admin(token, &key) || is_moderator(token, &key),
-        None => false,
-    };
-
-    match filter.deleted {
-        None | Some(Deleted::Only) if !is_admin_or_moderator => {
-            return Err(Error::Unauthorized("Yetkisiz istek.".to_string()));
-        }
-        _ => {}
-    }
-
-    let entry_pages = Entry::find()
-        .filter(EntryColumn::TitleId.eq(title_id))
-        .apply_if(Some(&filter.deleted), |query, v| match v {
-            Some(Deleted::Only) => query.filter(EntryColumn::DeletedAt.is_not_null()),
-            Some(Deleted::None) => query.filter(EntryColumn::DeletedAt.is_null()),
-            None => query,
+    let base_query = Entry::find()
+        .filter(EntryColumn::TitleId.eq(id))
+        .filter(EntryColumn::DeletedAt.is_null())
+        .apply_if(Some(query.from), |q, v| match v {
+            Some(v) => q.filter(EntryColumn::CreatedAt.gt(v)),
+            None => q,
         })
-        .order_by_asc(EntryColumn::CreatedAt)
-        .paginate(db, filter.per_page.into());
+        .apply_if(Some(query.to), |q, v| match v {
+            Some(v) => q.filter(EntryColumn::CreatedAt.lt(v)),
+            None => q,
+        })
+        .apply_if(Some(query.order_by), |q, v| match v {
+            Some(OrderBy::CreatedAt) => match query.order {
+                Some(order::Order::Asc) => q.order_by_asc(EntryColumn::CreatedAt),
+                Some(order::Order::Desc) => q.order_by_desc(EntryColumn::CreatedAt),
+                None => q,
+            },
+            Some(OrderBy::UpdatedAt) => match query.order {
+                Some(order::Order::Asc) => q.order_by_asc(EntryColumn::UpdatedAt),
+                Some(order::Order::Desc) => q.order_by_desc(EntryColumn::UpdatedAt),
+                None => q,
+            },
+            Some(OrderBy::NetVotes) => match query.order {
+                Some(order::Order::Asc) => q.order_by_asc(EntryColumn::NetVotes),
+                Some(order::Order::Desc) => q.order_by_desc(EntryColumn::NetVotes),
+                None => q,
+            },
+            None => q.order_by_asc(EntryColumn::CreatedAt),
+        })
+        .inner_join(User)
+        .filter(UserColumn::DeletedAt.is_null())
+        .filter(UserColumn::IsFaded.eq(false));
+
+    let entry_pages = base_query.clone().paginate(db, query.per_page.into());
 
     let entries = entry_pages
-        .fetch_page(filter.page.into())
+        .fetch_page(query.page.into())
         .await
         .map_err(|_| Error::InternalError("Girdiler getirilemedi.".to_string()))?;
 
-    let title_name = Title::find()
-        .filter(TitleColumn::Id.eq(title_id))
-        .apply_if(Some(!is_admin_or_moderator), |query, v| {
-            if v {
-                query.filter(TitleColumn::IsVisible.eq(true))
-            } else {
-                query
-            }
-        })
+    let title_name: String = Title::find()
+        .filter(TitleColumn::Id.eq(id))
+        .filter(TitleColumn::IsVisible.eq(true))
+        .select_only()
+        .column(TitleColumn::Name)
+        .into_tuple()
         .one(db)
         .await
         .map_err(|_| Error::InternalError("Başlık adı getirilemedi.".to_string()))
-        .and_then(|title| title.ok_or(Error::NotFound("Başlık adı getirilemedi.".to_string())))?
-        .name;
+        .and_then(|title_name: Option<String>| {
+            title_name.ok_or(Error::NotFound("Başlık adı getirilemedi.".to_string()))
+        })?;
 
     let entry_dto_futures = entries.into_iter().map(|entry| {
         let db = db.clone();
@@ -311,23 +314,24 @@ pub async fn get_title_entries(
         async move {
             let user = User::find()
                 .filter(UserColumn::Id.eq(entry.user_id))
-                .apply_if(Some(&filter.author), |query, v| match v {
-                    Some(Author::Only) => query.filter(UserColumn::IsAuthor.eq(true)),
-                    Some(Author::None) => query.filter(UserColumn::IsAuthor.eq(false)),
-                    None => query,
-                })
+                .filter(UserColumn::DeletedAt.is_null())
+                .filter(UserColumn::IsFaded.eq(false))
                 .one(&db)
                 .await;
 
             if let Ok(Some(user)) = user {
                 Ok(Some(EntryDto {
                     id: entry.id,
-                    title_id: entry.title_id,
-                    title: title_name,
+                    title: EntryTitleDto {
+                        id,
+                        name: title_name.clone(),
+                    },
                     content: entry.content,
-                    user_id: entry.user_id,
-                    user_nickname: user.nickname,
-                    is_author_entry: user.is_author,
+                    author: EntryAuthorDto {
+                        id: user.id,
+                        nickname: user.nickname,
+                        is_faded: user.is_faded,
+                    },
                     created_at: entry.created_at.to_string(),
                     updated_at: entry.updated_at.to_string(),
                 }))
@@ -344,127 +348,79 @@ pub async fn get_title_entries(
 
     let entry_dtos: Vec<EntryDto> = entry_dtos?.into_iter().flatten().collect();
 
-    let total = Entry::find()
-        .filter(EntryColumn::TitleId.eq(title_id))
-        .apply_if(Some(&filter.deleted), |query, v| match v {
-            Some(Deleted::Only) => query.filter(EntryColumn::DeletedAt.is_not_null()),
-            Some(Deleted::None) => query.filter(EntryColumn::DeletedAt.is_null()),
-            None => query,
-        })
-        .inner_join(User)
-        .apply_if(Some(&filter.author), |query, v| match v {
-            Some(Author::Only) => query.filter(UserColumn::IsAuthor.eq(true)),
-            Some(Author::None) => query.filter(UserColumn::IsAuthor.eq(false)),
-            None => query,
-        })
+    let total = base_query
         .count(db)
         .await
         .map_err(|_| Error::InternalError("Girdi sayısı getirilemedi.".to_string()))?;
 
     Ok(PaginationResponse {
         total,
-        page: filter.page,
-        per_page: filter.per_page,
+        page: query.page,
+        per_page: query.per_page,
         data: entry_dtos,
     })
 }
 
 pub async fn get_user_entries(
     db: &DbConn,
-    cookie: Option<&str>,
-    user_id: i32,
-    filter: GetUserEntriesFilter,
+    id: i32,
+    query: PaginationQuery,
 ) -> Result<PaginationResponse<EntryDto>> {
-    filter.validate().map_err(|_| {
+    query.validate().map_err(|_| {
         Error::InvalidRequest("Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string())
     })?;
 
-    let key = match std::env::var("JWT_SECRET") {
-        Ok(key) => key,
-        Err(_) => return Err(Error::InternalError("JWT anahtarı bulunamadı.".to_string())),
-    };
-
-    let token = match cookie {
-        Some(cookie) => extract_cookie_value(cookie, "token"),
-        None => None,
-    };
-
-    let is_admin_or_moderator = match token {
-        Some(token) => is_admin(token, &key) || is_moderator(token, &key),
-        None => false,
-    };
-
-    let self_user_id = match token {
-        Some(token) => get_id(token, &key),
-        None => None,
-    };
-
-    match filter.deleted {
-        None | Some(Deleted::Only)
-            if !is_admin_or_moderator && self_user_id.is_none()
-                || !is_admin_or_moderator
-                    && self_user_id.is_some()
-                    && user_id != self_user_id.unwrap() =>
-        {
-            return Err(Error::Unauthorized("Yetkisiz istek.".to_string()));
-        }
-        _ => {}
-    }
-
-    match filter.title_visible {
-        Some(TitleVisible::None) | None if !is_admin_or_moderator => {
-            return Err(Error::Unauthorized("Yetkisiz istek.".to_string()));
-        }
-        _ => {}
-    }
-
-    let user = User::find()
-        .filter(UserColumn::Id.eq(user_id))
+    let (nickname, is_faded): (String, bool) = User::find()
+        .filter(UserColumn::Id.eq(id))
+        .filter(UserColumn::DeletedAt.is_null())
+        .select_only()
+        .column(UserColumn::Nickname)
+        .column(UserColumn::IsFaded)
+        .into_tuple()
         .one(db)
         .await
         .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
         .and_then(|user| user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string())))?;
 
-    let entry_pages = Entry::find()
-        .filter(EntryColumn::UserId.eq(user_id))
-        .apply_if(Some(&filter.deleted), |query, v| match v {
-            Some(Deleted::Only) => query.filter(EntryColumn::DeletedAt.is_not_null()),
-            Some(Deleted::None) => query.filter(EntryColumn::DeletedAt.is_null()),
-            None => query,
-        })
-        .order_by_asc(EntryColumn::CreatedAt)
-        .paginate(db, filter.per_page.into());
+    let base_query = Entry::find()
+        .filter(EntryColumn::UserId.eq(id))
+        .filter(EntryColumn::DeletedAt.is_null())
+        .inner_join(Title)
+        .filter(TitleColumn::IsVisible.eq(true));
+
+    let entry_pages = base_query
+        .clone()
+        .order_by_desc(EntryColumn::CreatedAt)
+        .paginate(db, query.per_page.into());
 
     let entries = entry_pages
-        .fetch_page(filter.page.into())
+        .fetch_page(query.page.into())
         .await
         .map_err(|_| Error::InternalError("Girdiler getirilemedi.".to_string()))?;
 
     let entry_dto_futures = entries.into_iter().map(|entry| {
         let db = db.clone();
-        let user_nickname = user.nickname.clone();
-        let user_is_author = user.is_author;
+        let nickname = nickname.clone();
 
         async move {
             let title = Title::find()
                 .filter(TitleColumn::Id.eq(entry.title_id))
-                .apply_if(Some(&filter.title_visible), |query, v| match v {
-                    Some(TitleVisible::Only) => query.filter(TitleColumn::IsVisible.eq(true)),
-                    Some(TitleVisible::None) => query.filter(TitleColumn::IsVisible.eq(false)),
-                    None => query,
-                })
                 .one(&db)
                 .await;
 
             if let Ok(Some(title)) = title {
                 Ok(Some(EntryDto {
                     id: entry.id,
-                    title_id: entry.title_id,
-                    title: title.name,
+                    title: EntryTitleDto {
+                        id: title.id,
+                        name: title.name,
+                    },
                     content: entry.content,
-                    user_id: entry.user_id,
-                    user_nickname,
-                    is_author_entry: user_is_author,
+                    author: EntryAuthorDto {
+                        id,
+                        nickname,
+                        is_faded,
+                    },
                     created_at: entry.created_at.to_string(),
                     updated_at: entry.updated_at.to_string(),
                 }))
@@ -481,27 +437,15 @@ pub async fn get_user_entries(
 
     let entry_dtos: Vec<EntryDto> = entry_dtos?.into_iter().flatten().collect();
 
-    let total = Entry::find()
-        .filter(EntryColumn::UserId.eq(user_id))
-        .apply_if(Some(&filter.deleted), |query, v| match v {
-            Some(Deleted::Only) => query.filter(EntryColumn::DeletedAt.is_not_null()),
-            Some(Deleted::None) => query.filter(EntryColumn::DeletedAt.is_null()),
-            None => query,
-        })
-        .inner_join(Title)
-        .apply_if(Some(&filter.title_visible), |query, v| match v {
-            Some(TitleVisible::Only) => query.filter(TitleColumn::IsVisible.eq(true)),
-            Some(TitleVisible::None) => query.filter(TitleColumn::IsVisible.eq(false)),
-            None => query,
-        })
+    let total = base_query
         .count(db)
         .await
         .map_err(|_| Error::InternalError("Girdi sayısı getirilemedi.".to_string()))?;
 
     Ok(PaginationResponse {
         total,
-        page: filter.page,
-        per_page: filter.per_page,
+        page: query.page,
+        per_page: query.per_page,
         data: entry_dtos,
     })
 }

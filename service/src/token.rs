@@ -7,7 +7,7 @@ pub struct UserClaims {
     pub email: String,
     pub is_admin: bool,
     pub is_moderator: bool,
-    pub is_author: bool,
+    pub is_faded: bool,
     pub iat: i64,
     pub exp: i64,
 }
@@ -43,7 +43,7 @@ pub fn get_field_from_token(token: &str, field: TokenField, key: &str) -> Option
             TokenField::Email => Some(token.claims.email),
             TokenField::IsAdmin => Some(token.claims.is_admin.to_string()),
             TokenField::IsModerator => Some(token.claims.is_moderator.to_string()),
-            TokenField::IsAuthor => Some(token.claims.is_author.to_string()),
+            TokenField::IsAuthor => Some(token.claims.is_faded.to_string()),
             TokenField::Iat => Some(token.claims.iat.to_string()),
             TokenField::Exp => Some(token.claims.exp.to_string()),
         },
@@ -100,7 +100,7 @@ mod tests {
             email: "john.doe@example.com".to_string(),
             is_admin: false,
             is_moderator: false,
-            is_author: false,
+            is_faded: false,
             iat: chrono::Utc::now().timestamp(),
             exp: chrono::Utc::now().timestamp() + 60 * 60 * 24,
         };
@@ -124,7 +124,7 @@ mod tests {
             email: "john.doe@example.com".to_string(),
             is_admin: false,
             is_moderator: false,
-            is_author: false,
+            is_faded: false,
             iat: chrono::Utc::now().timestamp(),
             exp: chrono::Utc::now().timestamp() + 60 * 60 * 24,
         };
@@ -148,7 +148,7 @@ mod tests {
             email: "jane.doe@example.com".to_string(),
             is_admin: false,
             is_moderator: true,
-            is_author: true,
+            is_faded: true,
             iat: chrono::Utc::now().timestamp(),
             exp: chrono::Utc::now().timestamp() + 60 * 60 * 24,
         };
@@ -182,7 +182,7 @@ mod tests {
         );
         assert_eq!(
             get_field_from_token(&token, TokenField::IsAuthor, key),
-            Some(claims.is_author.to_string())
+            Some(claims.is_faded.to_string())
         );
         assert_eq!(
             get_field_from_token(&token, TokenField::Iat, key),
@@ -208,7 +208,7 @@ mod tests {
             email: "john.doe@example.com".to_string(),
             is_admin: true,
             is_moderator: false,
-            is_author: false,
+            is_faded: false,
             iat: chrono::Utc::now().timestamp(),
             exp: chrono::Utc::now().timestamp() + 60 * 60 * 24,
         };

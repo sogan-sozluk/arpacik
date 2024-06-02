@@ -94,7 +94,7 @@ pub async fn login(db: &DbConn, request: LoginRequest) -> Result<Cookie> {
         email: user.email,
         is_admin: user.is_admin,
         is_moderator: user.is_moderator,
-        is_author: user.is_author,
+        is_faded: user.is_faded,
         iat: chrono::Utc::now().timestamp(),
         exp: chrono::Utc::now().timestamp() + 60 * 60 * 24,
     };

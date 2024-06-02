@@ -46,10 +46,10 @@ impl MigrationTrait for Migration {
                             .default(false),
                     )
                     .col(
-                        ColumnDef::new(User::IsAuthor)
+                        ColumnDef::new(User::IsFaded)
                             .boolean()
                             .not_null()
-                            .default(false),
+                            .default(true),
                     )
                     .col(
                         ColumnDef::new(User::CreatedAt)
@@ -144,6 +144,18 @@ impl MigrationTrait for Migration {
                             .string_len(65535)
                             .unique_key()
                             .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Entry::NetVotes)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .col(
+                        ColumnDef::new(Entry::TotalFavorites)
+                            .integer()
+                            .not_null()
+                            .default(0),
                     )
                     .col(
                         ColumnDef::new(Entry::CreatedAt)
@@ -362,7 +374,7 @@ enum User {
     PasswordHash,
     IsAdmin,
     IsModerator,
-    IsAuthor,
+    IsFaded,
     CreatedAt,
     UpdatedAt,
     DeletedAt,
@@ -392,6 +404,8 @@ enum Entry {
     UserId,
     TitleId,
     Content,
+    NetVotes,
+    TotalFavorites,
     CreatedAt,
     UpdatedAt,
     DeletedAt,

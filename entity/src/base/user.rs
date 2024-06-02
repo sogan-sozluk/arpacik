@@ -15,7 +15,7 @@ pub struct Model {
     pub password_hash: String,
     pub is_admin: bool,
     pub is_moderator: bool,
-    pub is_author: bool,
+    pub is_faded: bool,
     pub created_at: DateTime,
     pub updated_at: DateTime,
     pub deleted_at: Option<DateTime>,
