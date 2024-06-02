@@ -281,7 +281,10 @@ pub async fn get_title_entries(
                 Some(order::Order::Desc) => q.order_by_desc(EntryColumn::NetVotes),
                 None => q,
             },
-            None => q.order_by_asc(EntryColumn::CreatedAt),
+            None => match query.order {
+                Some(order::Order::Desc) => q.order_by_desc(EntryColumn::CreatedAt),
+                _ => q.order_by_asc(EntryColumn::CreatedAt),
+            },
         })
         .inner_join(User)
         .filter(UserColumn::DeletedAt.is_null())
