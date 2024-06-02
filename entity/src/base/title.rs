@@ -10,6 +10,7 @@ pub struct Model {
     pub id: i32,
     #[sea_orm(unique)]
     pub name: String,
+    pub last_entry_at: DateTime,
     pub is_visible: bool,
 }
 

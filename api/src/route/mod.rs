@@ -8,6 +8,7 @@ use axum::{
 pub mod auth;
 pub mod entry;
 pub mod hello;
+pub mod today;
 
 pub fn build(state: AppState) -> Router {
     let api_router = Router::new()
@@ -26,6 +27,7 @@ pub fn build(state: AppState) -> Router {
         .route("/entries/:id", get(entry::get_entry))
         .route("/users/:id/entries", get(entry::get_user_entries))
         .route("/titles/:id/entries", get(entry::get_title_entries))
+        .route("/today", get(today::today))
         .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login))
         .with_state(state.clone());

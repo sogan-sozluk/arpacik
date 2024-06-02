@@ -116,6 +116,12 @@ impl MigrationTrait for Migration {
                             .not_null(),
                     )
                     .col(
+                        ColumnDef::new(Title::LastEntryAt)
+                            .timestamp()
+                            .not_null()
+                            .default(current_timestamp_utc()),
+                    )
+                    .col(
                         ColumnDef::new(Title::IsVisible)
                             .boolean()
                             .not_null()
@@ -394,6 +400,7 @@ enum Title {
     Table,
     Id,
     Name,
+    LastEntryAt,
     IsVisible,
 }
 
