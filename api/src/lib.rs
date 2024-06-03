@@ -3,6 +3,7 @@ use migration::{Migrator, MigratorTrait};
 use service::sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use std::env;
 
+mod error;
 mod middleware;
 mod route;
 
@@ -29,7 +30,10 @@ async fn start() -> anyhow::Result<()> {
 
     let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET is not set in .env file");
 
-    let state = AppState { conn, jwt_secret };
+    let state = AppState {
+        conn,
+        _jwt_secret: jwt_secret,
+    };
     let router = route::build(state);
     let app = Router::new().nest("/", router);
     let listener = tokio::net::TcpListener::bind(&server_url).await.unwrap();
@@ -42,7 +46,7 @@ async fn start() -> anyhow::Result<()> {
 #[derive(Clone)]
 struct AppState {
     conn: DatabaseConnection,
-    jwt_secret: String,
+    _jwt_secret: String,
 }
 
 pub fn main() {

@@ -29,8 +29,7 @@ pub fn build(state: AppState) -> Router {
         .route("/titles/:id/entries", get(entry::get_title_entries))
         .route("/today", get(today::today))
         .route("/auth/register", post(auth::register))
-        .route("/auth/login", post(auth::login))
-        .with_state(state.clone());
+        .route("/auth/login", post(auth::login));
 
     Router::new().nest("/api/v1", api_router).with_state(state)
 }
