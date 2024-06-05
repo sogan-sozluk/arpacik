@@ -7,6 +7,7 @@ use axum::{
 
 pub mod auth;
 pub mod entry;
+pub mod feed;
 pub mod hello;
 pub mod today;
 pub mod trends;
@@ -30,6 +31,7 @@ pub fn build(state: AppState) -> Router {
         .route("/titles/:id/entries", get(entry::get_title_entries))
         .route("/today", get(today::today))
         .route("/trends", get(trends::trends))
+        .route("/feed", get(feed::feed))
         .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login));
 
