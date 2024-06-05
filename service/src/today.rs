@@ -66,7 +66,7 @@ pub async fn today(
     let total = base_query
         .count(db)
         .await
-        .map_err(|_| Error::InternalError("Başlıklar sayısı getirilemedi.".to_string()))?;
+        .map_err(|_| Error::InternalError("Başlık sayısı getirilemedi.".to_string()))?;
 
     Ok(PaginationResponse {
         total,
