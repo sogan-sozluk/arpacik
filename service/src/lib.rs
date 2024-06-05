@@ -6,6 +6,7 @@ pub mod error;
 pub mod title;
 pub mod today;
 pub mod token;
+pub mod trends;
 pub mod user;
 pub mod validation;
 
