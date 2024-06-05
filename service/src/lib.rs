@@ -3,6 +3,7 @@ pub mod cookie;
 pub mod dto;
 pub mod entry;
 pub mod error;
+pub mod feed;
 pub mod title;
 pub mod today;
 pub mod token;
