@@ -25,6 +25,7 @@ pub async fn trends(
         .unwrap();
 
     let base_query = Title::find()
+        .filter(TitleColumn::IsVisible.eq(true))
         .select_only()
         .column(TitleColumn::Id)
         .column(TitleColumn::Name)
@@ -36,6 +37,7 @@ pub async fn trends(
                 .to(TitleColumn::Id)
                 .into(),
         )
+        .filter(EntryColumn::DeletedAt.is_null())
         .group_by(TitleColumn::Id)
         .filter(EntryColumn::CreatedAt.gt(two_days_ago))
         .order_by_desc(Expr::col(Alias::new("entry_count")))
