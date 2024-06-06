@@ -256,7 +256,7 @@ pub async fn migrate_entry(db: &DbConn, cookie: &str, id: i32, title_id: i32) ->
     entry.title_id = Set(title_id);
 
     entry
-        .save(db)
+        .update(db)
         .await
         .map_err(|_| Error::InternalError("Girdi taşınamadı.".to_string()))?;
 
@@ -469,4 +469,96 @@ pub async fn get_user_entries(
         per_page: query.per_page,
         data: entry_dtos,
     })
+}
+
+pub async fn favorite_entry(db: &DbConn, user_id: i32, entry_id: i32) -> Result<()> {
+    let mut entry = Entry::find()
+        .filter(EntryColumn::Id.eq(entry_id))
+        .filter(EntryColumn::DeletedAt.is_null())
+        .inner_join(Title)
+        .filter(TitleColumn::IsVisible.eq(true))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Girdi bulunamadı.".to_string()))
+        .and_then(|entry| entry.ok_or(Error::NotFound("Girdi bulunamadı.".to_string())))?
+        .into_active_model();
+
+    User::find()
+        .filter(UserColumn::Id.eq(user_id))
+        .filter(UserColumn::DeletedAt.is_null())
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
+        .and_then(|user| user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string())))?;
+
+    // TODO: Use exists instead of find
+    let favorite = Favorite::find()
+        .filter(FavoriteColumn::UserId.eq(user_id))
+        .filter(FavoriteColumn::EntryId.eq(entry_id))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Favori bulunamadı.".to_string()))?;
+
+    if favorite.is_some() {
+        return Err(Error::InvalidRequest(
+            "Zaten favorilere eklenmiş.".to_string(),
+        ));
+    }
+
+    FavoriteActiveModel {
+        user_id: Set(user_id),
+        entry_id: Set(entry_id),
+        ..Default::default()
+    }
+    .save(db)
+    .await
+    .map_err(|_| Error::InternalError("Favori eklenemedi.".to_string()))?;
+
+    entry.total_favorites = Set(entry.total_favorites.unwrap() + 1);
+    entry
+        .update(db)
+        .await
+        .map_err(|_| Error::InternalError("Favori eklenemedi.".to_string()))?;
+
+    Ok(())
+}
+
+pub async fn unfavorite_entry(db: &DbConn, user_id: i32, entry_id: i32) -> Result<()> {
+    let mut entry = Entry::find()
+        .filter(EntryColumn::Id.eq(entry_id))
+        .filter(EntryColumn::DeletedAt.is_null())
+        .inner_join(Title)
+        .filter(TitleColumn::IsVisible.eq(true))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Girdi bulunamadı.".to_string()))
+        .and_then(|entry| entry.ok_or(Error::NotFound("Girdi bulunamadı.".to_string())))?
+        .into_active_model();
+
+    User::find()
+        .filter(UserColumn::Id.eq(user_id))
+        .filter(UserColumn::DeletedAt.is_null())
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
+        .and_then(|user| user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string())))?;
+
+    Favorite::find()
+        .filter(FavoriteColumn::UserId.eq(user_id))
+        .filter(FavoriteColumn::EntryId.eq(entry_id))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Favori bulunamadı.".to_string()))
+        .and_then(|favorite| favorite.ok_or(Error::NotFound("Favori bulunamadı.".to_string())))?
+        .delete(db)
+        .await
+        .map_err(|_| Error::InternalError("Favori silinemedi.".to_string()))?;
+
+    entry.total_favorites = Set(entry.total_favorites.unwrap() - 1);
+    entry
+        .update(db)
+        .await
+        .map_err(|_| Error::InternalError("Favori silinemedi.".to_string()))?;
+
+    Ok(())
 }
