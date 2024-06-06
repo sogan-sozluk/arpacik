@@ -24,6 +24,8 @@ pub fn build(state: AppState) -> Router {
             "/entries/:id/to-title/:title_id",
             patch(entry::migrate_entry),
         )
+        .route("/entries/:id/favorite", post(entry::favorite_entry))
+        .route("/entries/:id/unfavorite", post(entry::unfavorite_entry))
         .route_layer(middleware::from_fn(crate::middleware::auth::auth))
         .route("/hello", get(hello::hello_world))
         .route("/entries/:id", get(entry::get_entry))

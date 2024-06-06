@@ -4,6 +4,7 @@ use axum::{
     Json,
 };
 use service::{
+    cookie::extract_cookie_value,
     dto::{
         entry::{CreateEntryRequest, EntryDto, GetTitleEntriesQuery, UpdateEntryRequest},
         pagination::{PaginationQuery, PaginationResponse},
@@ -123,6 +124,42 @@ pub async fn migrate_entry(
     let cookie = get_cookie(&headers)
         .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
     match service::entry::migrate_entry(&state.conn, &cookie, id, title_id).await {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => Err(e.into_error_response()),
+    }
+}
+
+pub async fn favorite_entry(
+    state: State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<i32>,
+) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
+    // TODO: Just get the user id from the cookie
+    let cookie = get_cookie(&headers)
+        .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
+    let token = extract_cookie_value(&cookie, "token")
+        .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
+    let user_id = service::token::get_id(token, &state.jwt_secret)
+        .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
+    match service::entry::favorite_entry(&state.conn, user_id, id).await {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => Err(e.into_error_response()),
+    }
+}
+
+pub async fn unfavorite_entry(
+    state: State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<i32>,
+) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
+    // TODO: Just get the user id from the cookie
+    let cookie = get_cookie(&headers)
+        .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
+    let token = extract_cookie_value(&cookie, "token")
+        .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
+    let user_id = service::token::get_id(token, &state.jwt_secret)
+        .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
+    match service::entry::unfavorite_entry(&state.conn, user_id, id).await {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
         Err(e) => Err(e.into_error_response()),
     }
