@@ -4,7 +4,6 @@ use axum::{
     Json,
 };
 use service::{
-    cookie::extract_cookie_value,
     dto::{
         entry::{CreateEntryRequest, EntryDto, GetTitleEntriesQuery, UpdateEntryRequest},
         pagination::{PaginationQuery, PaginationResponse},
@@ -13,7 +12,10 @@ use service::{
 };
 
 use crate::{
-    error::{ErrorBody, IntoErrorResponse}, helper::get_user_id_from_headers, middleware::auth::get_cookie, AppState
+    error::{ErrorBody, IntoErrorResponse},
+    helper::get_user_id_from_headers,
+    middleware::auth::get_cookie,
+    AppState,
 };
 
 pub async fn create_entry(
