@@ -9,6 +9,7 @@ pub mod auth;
 pub mod entry;
 pub mod feed;
 pub mod hello;
+pub mod search;
 pub mod today;
 pub mod trends;
 
@@ -34,6 +35,7 @@ pub fn build(state: AppState) -> Router {
         .route("/today", get(today::today))
         .route("/trends", get(trends::trends))
         .route("/feed", get(feed::feed))
+        .route("/search", get(search::search))
         .route("/auth/register", post(auth::register))
         .route("/auth/login", post(auth::login));
 
