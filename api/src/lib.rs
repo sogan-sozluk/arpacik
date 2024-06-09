@@ -4,6 +4,7 @@ use service::sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use std::env;
 
 mod error;
+mod helper;
 mod middleware;
 mod route;
 
