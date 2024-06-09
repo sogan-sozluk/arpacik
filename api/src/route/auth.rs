@@ -1,5 +1,5 @@
 use crate::error::{ErrorBody, IntoErrorResponse};
-use crate::middleware::auth::get_cookie;
+use crate::traits::HeadersCookie;
 use crate::AppState;
 use axum::http::header::SET_COOKIE;
 use axum::http::HeaderMap;
@@ -35,7 +35,8 @@ pub async fn logout(
     state: State<AppState>,
     headers: HeaderMap,
 ) -> Result<(HeaderMap, StatusCode), (StatusCode, Json<ErrorBody>)> {
-    let cookie = get_cookie(&headers)
+    let cookie = headers
+        .cookie()
         .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
     match service::auth::logout(&state.conn, &cookie).await {
         Ok(cookie) => {

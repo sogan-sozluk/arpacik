@@ -1,18 +1,21 @@
 use axum::{
-    extract::Request,
+    extract::{Request, State},
     http::{HeaderMap, StatusCode},
     middleware::Next,
     response::Response,
 };
-use service::cookie::authorize;
+use service::auth::{authorize, Role};
+
+use crate::{traits::HeadersCookie, AppState};
 
 pub async fn auth(
+    State(state): State<AppState>,
     headers: HeaderMap,
     request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    match get_cookie(&headers) {
-        Some(cookie) if authorize(&cookie) => {
+    match headers.cookie() {
+        Some(cookie) if authorize(&cookie, &state.jwt_secret, Role::User) => {
             let response = next.run(request).await;
             Ok(response)
         }
@@ -20,9 +23,32 @@ pub async fn auth(
     }
 }
 
-pub fn get_cookie(headers: &HeaderMap) -> Option<String> {
-    let cookie = headers.get("cookie")?;
-    let cookie = cookie.to_str().ok()?;
+pub async fn auth_moderator(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    request: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    match headers.cookie() {
+        Some(cookie) if authorize(&cookie, &state.jwt_secret, Role::Moderator) => {
+            let response = next.run(request).await;
+            Ok(response)
+        }
+        _ => Err(StatusCode::UNAUTHORIZED),
+    }
+}
 
-    Some(cookie.to_string())
+pub async fn _auth_admin(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    request: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    match headers.cookie() {
+        Some(cookie) if authorize(&cookie, &state.jwt_secret, Role::Admin) => {
+            let response = next.run(request).await;
+            Ok(response)
+        }
+        _ => Err(StatusCode::UNAUTHORIZED),
+    }
 }

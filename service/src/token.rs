@@ -12,7 +12,7 @@ pub struct UserClaims {
     pub exp: i64,
 }
 
-pub fn is_token_valid(token: &str, key: &str) -> bool {
+pub fn validate_token(token: &str, key: &str) -> bool {
     let key = jsonwebtoken::DecodingKey::from_secret(key.as_bytes());
     let validation = jsonwebtoken::Validation::default();
     let token = jsonwebtoken::decode::<UserClaims>(token, &key, &validation);
@@ -112,7 +112,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(is_token_valid(&token, key));
+        assert!(validate_token(&token, key));
     }
 
     #[test]
@@ -136,7 +136,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(!is_token_valid(&token, "invalid_key"));
+        assert!(!validate_token(&token, "invalid_key"));
     }
 
     #[test]

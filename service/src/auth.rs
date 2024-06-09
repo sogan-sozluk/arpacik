@@ -1,8 +1,8 @@
 use std::env;
 
-use crate::cookie::{extract_cookie_value, Cookie};
+use crate::cookie::{cookie_value, Cookie};
 use crate::dto::auth::{LoginRequest, RegisterRequest};
-use crate::token::UserClaims;
+use crate::token::{is_admin, is_moderator, validate_token, UserClaims};
 use crate::{Error, Result};
 use ::entity::prelude::*;
 use argon2::PasswordVerifier;
@@ -13,6 +13,27 @@ use argon2::{
 use chrono::TimeZone;
 use sea_orm::*;
 use validator::Validate;
+
+pub enum Role {
+    Admin,
+    Moderator,
+    User,
+}
+
+pub fn authorize(cookie: &str, jwt_secret: &str, role: Role) -> bool {
+    let token = match cookie_value(cookie, "token") {
+        Some(token) => token,
+        None => return false,
+    };
+
+    let is_valid = validate_token(token, jwt_secret);
+
+    match role {
+        Role::Admin => is_admin(token, jwt_secret) && is_valid,
+        Role::Moderator => is_moderator(token, jwt_secret) && is_valid,
+        Role::User => is_valid,
+    }
+}
 
 pub async fn register(db: &DbConn, request: RegisterRequest) -> Result<UserActiveModel> {
     match request.validate() {
@@ -141,7 +162,7 @@ pub async fn login(db: &DbConn, request: LoginRequest) -> Result<Cookie> {
 }
 
 pub async fn logout(db: &DbConn, cookie: &str) -> Result<Cookie> {
-    let token = match extract_cookie_value(cookie, "token") {
+    let token = match cookie_value(cookie, "token") {
         Some(token) => token,
         None => return Err(Error::InvalidToken),
     };
