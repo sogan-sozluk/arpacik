@@ -1,5 +1,3 @@
-use crate::token::{is_admin, is_author, is_moderator, is_token_valid};
-
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Cookie {
     pub name: String,
@@ -119,81 +117,13 @@ impl std::fmt::Display for CookieJar {
     }
 }
 
-pub fn extract_cookie_value<'a>(cookie: &'a str, name: &str) -> Option<&'a str> {
+pub fn cookie_value<'a>(cookie: &'a str, name: &str) -> Option<&'a str> {
     let name = format!("{}=", name);
     let start = cookie.find(&name)?;
     let start = start + name.len();
     let end = cookie[start..].find(';').unwrap_or(cookie.len() - start);
 
     Some(&cookie[start..start + end])
-}
-
-pub fn authorize(cookie: &str) -> bool {
-    let key = match std::env::var("JWT_SECRET") {
-        Ok(key) => key,
-        Err(_) => return false,
-    };
-
-    let token = match extract_cookie_value(cookie, "token") {
-        Some(token) => token,
-        None => return false,
-    };
-
-    is_token_valid(token, &key)
-}
-
-pub fn authorize_admin(cookie: &str) -> bool {
-    let key = match std::env::var("JWT_SECRET") {
-        Ok(key) => key,
-        Err(_) => return false,
-    };
-
-    let token = match extract_cookie_value(cookie, "token") {
-        Some(token) => token,
-        None => return false,
-    };
-
-    if !is_token_valid(token, &key) {
-        return false;
-    }
-
-    is_admin(token, &key)
-}
-
-pub fn authorize_moderator(cookie: &str) -> bool {
-    let key = match std::env::var("JWT_SECRET") {
-        Ok(key) => key,
-        Err(_) => return false,
-    };
-
-    let token = match extract_cookie_value(cookie, "token") {
-        Some(token) => token,
-        None => return false,
-    };
-
-    if !is_token_valid(token, &key) {
-        return false;
-    }
-
-    is_moderator(token, &key)
-}
-
-pub fn authorize_author(cookie: &str) -> bool {
-    let key = match std::env::var("JWT_SECRET") {
-        Ok(key) => key,
-        Err(_) => return false,
-    };
-
-    let token = match extract_cookie_value(cookie, "token") {
-        Some(token) => token,
-        None => return false,
-    };
-
-    if !is_token_valid(token, &key) {
-        return false;
-    }
-
-    is_author(token, &key)
 }
 
 #[cfg(test)]
@@ -279,29 +209,26 @@ mod tests {
     #[test]
     fn test_extract_value() {
         let cookie_request = "name=value; location=istanbul; theme=dark; lang=en";
-        assert_eq!(extract_cookie_value(cookie_request, "name"), Some("value"));
-        assert_eq!(
-            extract_cookie_value(cookie_request, "location"),
-            Some("istanbul")
-        );
-        assert_eq!(extract_cookie_value(cookie_request, "theme"), Some("dark"));
-        assert_eq!(extract_cookie_value(cookie_request, "lang"), Some("en"));
+        assert_eq!(cookie_value(cookie_request, "name"), Some("value"));
+        assert_eq!(cookie_value(cookie_request, "location"), Some("istanbul"));
+        assert_eq!(cookie_value(cookie_request, "theme"), Some("dark"));
+        assert_eq!(cookie_value(cookie_request, "lang"), Some("en"));
 
         let cookie_request_no_whitespace = "name=value;location=istanbul;theme=dark;lang=en";
         assert_eq!(
-            extract_cookie_value(cookie_request_no_whitespace, "name"),
+            cookie_value(cookie_request_no_whitespace, "name"),
             Some("value")
         );
         assert_eq!(
-            extract_cookie_value(cookie_request_no_whitespace, "location"),
+            cookie_value(cookie_request_no_whitespace, "location"),
             Some("istanbul")
         );
         assert_eq!(
-            extract_cookie_value(cookie_request_no_whitespace, "theme"),
+            cookie_value(cookie_request_no_whitespace, "theme"),
             Some("dark")
         );
         assert_eq!(
-            extract_cookie_value(cookie_request_no_whitespace, "lang"),
+            cookie_value(cookie_request_no_whitespace, "lang"),
             Some("en")
         );
     }

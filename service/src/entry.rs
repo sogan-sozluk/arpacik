@@ -3,7 +3,6 @@ use sea_orm::*;
 use validator::Validate;
 
 use crate::{
-    cookie::extract_cookie_value,
     dto::{
         entry::{
             CreateEntryRequest, EntryAuthorDto, EntryDto, EntryTitleDto, GetTitleEntriesQuery,
@@ -13,23 +12,27 @@ use crate::{
         pagination::{PaginationQuery, PaginationResponse},
     },
     title::{create_title, title_id_by_name},
-    user::user_by_token,
     Error, Result,
 };
 
-pub async fn create_entry(db: &DbConn, cookie: &str, request: CreateEntryRequest) -> Result<()> {
+pub async fn create_entry(db: &DbConn, user_id: i32, request: CreateEntryRequest) -> Result<()> {
     request.validate().map_err(|_| {
         Error::InvalidRequest("Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string())
     })?;
 
-    let token = extract_cookie_value(cookie, "token")
-        .ok_or_else(|| Error::Unauthorized("Yetkisiz istek.".to_string()))?;
+    let is_faded = User::find()
+        .filter(UserColumn::Id.eq(user_id))
+        .filter(UserColumn::DeletedAt.is_null())
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
+        .and_then(|user| user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string())))?
+        .is_faded;
 
-    let user = user_by_token(db, token).await?;
     let title_id = match title_id_by_name(db, &request.title).await {
         Some(title_id) => title_id,
         None => {
-            if !user.is_faded {
+            if !is_faded {
                 create_title(db, &request.title).await?.id.unwrap()
             } else {
                 return Err(Error::InvalidRequest(
@@ -57,7 +60,7 @@ pub async fn create_entry(db: &DbConn, cookie: &str, request: CreateEntryRequest
 
     EntryActiveModel {
         title_id: Set(title_id),
-        user_id: Set(user.id),
+        user_id: Set(user_id),
         content: Set(request.content),
         ..Default::default()
     }
@@ -73,22 +76,16 @@ pub async fn create_entry(db: &DbConn, cookie: &str, request: CreateEntryRequest
     Ok(())
 }
 
-pub async fn delete_entry(db: &DbConn, cookie: &str, id: i32, soft_delete: bool) -> Result<()> {
-    let token = extract_cookie_value(cookie, "token")
-        .ok_or_else(|| Error::Unauthorized("Yetkisiz istek.".to_string()))?;
-
-    let user = user_by_token(db, token).await?;
-
+pub async fn delete_entry(db: &DbConn, user_id: i32, id: i32, soft_delete: bool) -> Result<()> {
     let entry = Entry::find()
         .filter(EntryColumn::Id.eq(id))
         .filter(EntryColumn::DeletedAt.is_null())
-        .apply_if(Some(!user.is_admin && !user.is_moderator), |query, v| {
-            if v {
-                query.filter(EntryColumn::UserId.eq(user.id))
-            } else {
-                query
-            }
-        })
+        .filter(EntryColumn::UserId.eq(user_id))
+        .inner_join(User)
+        .filter(UserColumn::DeletedAt.is_null())
+        .filter(UserColumn::Id.eq(user_id))
+        .inner_join(Title)
+        .filter(TitleColumn::IsVisible.eq(true))
         .one(db)
         .await
         .map_err(|_| Error::InternalError("Girdi bulunamadı.".to_string()))
@@ -114,22 +111,15 @@ pub async fn delete_entry(db: &DbConn, cookie: &str, id: i32, soft_delete: bool)
     Ok(())
 }
 
-pub async fn recover_entry(db: &DbConn, cookie: &str, id: i32) -> Result<()> {
-    let token = extract_cookie_value(cookie, "token")
-        .ok_or_else(|| Error::Unauthorized("Yetkisi istek.".to_string()))?;
-
-    let user = user_by_token(db, token).await?;
-
+pub async fn recover_entry(db: &DbConn, user_id: i32, id: i32) -> Result<()> {
     let entry = Entry::find()
         .filter(EntryColumn::Id.eq(id))
-        .filter(EntryColumn::DeletedAt.is_not_null())
-        .apply_if(Some(!user.is_admin && !user.is_moderator), |query, v| {
-            if v {
-                query.filter(EntryColumn::UserId.eq(user.id))
-            } else {
-                query
-            }
-        })
+        .filter(EntryColumn::UserId.eq(user_id))
+        .inner_join(User)
+        .filter(UserColumn::DeletedAt.is_null())
+        .filter(UserColumn::Id.eq(user_id))
+        .inner_join(Title)
+        .filter(TitleColumn::IsVisible.eq(true))
         .one(db)
         .await
         .map_err(|_| Error::InternalError("Girdi bulunamadı.".to_string()))
@@ -188,7 +178,7 @@ pub async fn get_entry(db: &DbConn, id: i32) -> Result<EntryDto> {
 
 pub async fn update_entry(
     db: &DbConn,
-    cookie: &str,
+    user_id: i32,
     id: i32,
     request: UpdateEntryRequest,
 ) -> Result<()> {
@@ -196,21 +186,15 @@ pub async fn update_entry(
         Error::InvalidRequest("Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string())
     })?;
 
-    let token = extract_cookie_value(cookie, "token")
-        .ok_or_else(|| Error::Unauthorized("Yetkisiz istek.".to_string()))?;
-
-    let user = user_by_token(db, token).await?;
-
     let entry = Entry::find()
         .filter(EntryColumn::Id.eq(id))
         .filter(EntryColumn::DeletedAt.is_null())
-        .apply_if(Some(!user.is_admin && !user.is_moderator), |query, v| {
-            if v {
-                query.filter(EntryColumn::UserId.eq(user.id))
-            } else {
-                query
-            }
-        })
+        .filter(EntryColumn::UserId.eq(user_id))
+        .inner_join(User)
+        .filter(UserColumn::DeletedAt.is_null())
+        .filter(UserColumn::Id.eq(user_id))
+        .inner_join(Title)
+        .filter(TitleColumn::IsVisible.eq(true))
         .one(db)
         .await
         .map_err(|_| Error::InternalError("Girdi bulunamadı.".to_string()))
@@ -228,15 +212,7 @@ pub async fn update_entry(
     Ok(())
 }
 
-pub async fn migrate_entry(db: &DbConn, cookie: &str, id: i32, title_id: i32) -> Result<()> {
-    let token = extract_cookie_value(cookie, "token")
-        .ok_or_else(|| Error::Unauthorized("Yetkisi istek.".to_string()))?;
-
-    let user = user_by_token(db, token).await?;
-    if !user.is_admin && !user.is_moderator {
-        return Err(Error::Unauthorized("Yetkisiz istek.".to_string()));
-    }
-
+pub async fn migrate_entry(db: &DbConn, id: i32, title_id: i32) -> Result<()> {
     let entry = Entry::find()
         .filter(EntryColumn::Id.eq(id))
         .one(db)

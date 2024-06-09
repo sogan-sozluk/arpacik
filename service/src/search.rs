@@ -36,7 +36,7 @@ pub async fn search(db: &DbConn, sq: SearchQuery) -> Result<Vec<SearchItem>> {
             .limit(10)
             .all(db)
             .await
-            .map_err(|_| Error::InternalError("Etiket bulunamadı.".to_string()))
+            .map_err(|_| Error::InternalError("Başlık bulunamadı.".to_string()))
             .map(|tags| {
                 tags.into_iter()
                     .map(|tag| SearchItem {

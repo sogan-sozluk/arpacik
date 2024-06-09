@@ -7,6 +7,7 @@ mod error;
 mod helper;
 mod middleware;
 mod route;
+mod traits;
 
 #[tokio::main]
 async fn start() -> anyhow::Result<()> {

@@ -14,7 +14,6 @@ use service::{
 use crate::{
     error::{ErrorBody, IntoErrorResponse},
     helper::get_user_id_from_headers,
-    middleware::auth::get_cookie,
     AppState,
 };
 
@@ -23,9 +22,9 @@ pub async fn create_entry(
     headers: HeaderMap,
     json_data: Json<CreateEntryRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
-    let cookie = get_cookie(&headers)
+    let user_id = get_user_id_from_headers(&headers, &state.jwt_secret)
         .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
-    match service::entry::create_entry(&state.conn, &cookie, json_data.0).await {
+    match service::entry::create_entry(&state.conn, user_id, json_data.0).await {
         Ok(_) => Ok(StatusCode::CREATED),
         Err(e) => Err(e.into_error_response()),
     }
@@ -36,9 +35,9 @@ pub async fn delete_entry(
     headers: HeaderMap,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
-    let cookie = get_cookie(&headers)
+    let user_id = get_user_id_from_headers(&headers, &state.jwt_secret)
         .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
-    match service::entry::delete_entry(&state.conn, &cookie, id, false).await {
+    match service::entry::delete_entry(&state.conn, user_id, id, false).await {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
         Err(e) => Err(e.into_error_response()),
     }
@@ -49,9 +48,9 @@ pub async fn soft_delete_entry(
     headers: HeaderMap,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
-    let cookie = get_cookie(&headers)
+    let user_id = get_user_id_from_headers(&headers, &state.jwt_secret)
         .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
-    match service::entry::delete_entry(&state.conn, &cookie, id, true).await {
+    match service::entry::delete_entry(&state.conn, user_id, id, true).await {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
         Err(e) => Err(e.into_error_response()),
     }
@@ -62,9 +61,9 @@ pub async fn recover_entry(
     headers: HeaderMap,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
-    let cookie = get_cookie(&headers)
+    let user_id = get_user_id_from_headers(&headers, &state.jwt_secret)
         .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
-    match service::entry::recover_entry(&state.conn, &cookie, id).await {
+    match service::entry::recover_entry(&state.conn, user_id, id).await {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
         Err(e) => Err(e.into_error_response()),
     }
@@ -108,9 +107,9 @@ pub async fn update_entry(
     Path(id): Path<i32>,
     json_data: Json<UpdateEntryRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
-    let cookie = get_cookie(&headers)
+    let user_id = get_user_id_from_headers(&headers, &state.jwt_secret)
         .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
-    match service::entry::update_entry(&state.conn, &cookie, id, json_data.0).await {
+    match service::entry::update_entry(&state.conn, user_id, id, json_data.0).await {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
         Err(e) => Err(e.into_error_response()),
     }
@@ -118,12 +117,9 @@ pub async fn update_entry(
 
 pub async fn migrate_entry(
     state: State<AppState>,
-    headers: HeaderMap,
     Path((id, title_id)): Path<(i32, i32)>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
-    let cookie = get_cookie(&headers)
-        .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
-    match service::entry::migrate_entry(&state.conn, &cookie, id, title_id).await {
+    match service::entry::migrate_entry(&state.conn, id, title_id).await {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
         Err(e) => Err(e.into_error_response()),
     }
