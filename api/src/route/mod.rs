@@ -10,6 +10,7 @@ pub mod entry;
 pub mod feed;
 pub mod hello;
 pub mod search;
+pub mod title;
 pub mod today;
 pub mod trends;
 
@@ -42,13 +43,19 @@ pub fn build(state: AppState) -> Router {
             crate::middleware::auth::auth,
         ));
 
-    let moderator = Router::new().route(
-        "/entries/:id/to-title/:title_id",
-        patch(entry::migrate_entry).layer(middleware::from_fn_with_state(
+    let moderator = Router::new()
+        .route(
+            "/entries/:id/to-title/:title_id",
+            patch(entry::migrate_entry),
+        )
+        .route(
+            "/titles/:id/set-visibility/:is_visible",
+            patch(title::set_title_visibility),
+        )
+        .layer(middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth::auth_moderator,
-        )),
-    );
+        ));
 
     Router::new()
         .nest(prefix, public)
