@@ -6,7 +6,7 @@ use axum::{
 };
 use service::auth::{authorize, Role};
 
-use crate::{traits::HeadersCookie, AppState};
+use crate::{traits::HeaderToken, AppState};
 
 pub async fn auth(
     State(state): State<AppState>,
@@ -14,8 +14,8 @@ pub async fn auth(
     request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    match headers.cookie() {
-        Some(cookie) if authorize(&cookie, &state.jwt_secret, Role::User) => {
+    match headers.token(state.auth_from) {
+        Some(token) if authorize(&token, &state.jwt_secret, Role::User) => {
             let response = next.run(request).await;
             Ok(response)
         }
@@ -29,8 +29,8 @@ pub async fn auth_moderator(
     request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    match headers.cookie() {
-        Some(cookie) if authorize(&cookie, &state.jwt_secret, Role::Moderator) => {
+    match headers.token(state.auth_from) {
+        Some(token) if authorize(&token, &state.jwt_secret, Role::Moderator) => {
             let response = next.run(request).await;
             Ok(response)
         }
@@ -44,8 +44,8 @@ pub async fn _auth_admin(
     request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    match headers.cookie() {
-        Some(cookie) if authorize(&cookie, &state.jwt_secret, Role::Admin) => {
+    match headers.token(state.auth_from) {
+        Some(token) if authorize(&token, &state.jwt_secret, Role::Admin) => {
             let response = next.run(request).await;
             Ok(response)
         }
