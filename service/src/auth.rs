@@ -1,6 +1,6 @@
 use std::env;
 
-use crate::cookie::{cookie_value, Cookie};
+use crate::cookie::Cookie;
 use crate::dto::auth::{LoginRequest, RegisterRequest};
 use crate::token::{is_admin, is_moderator, validate_token, UserClaims};
 use crate::{Error, Result};
@@ -14,18 +14,19 @@ use chrono::TimeZone;
 use sea_orm::*;
 use validator::Validate;
 
+#[derive(Clone, Copy)]
+pub enum AuthHeader {
+    Cookie,
+    Authorization,
+}
+
 pub enum Role {
     Admin,
     Moderator,
     User,
 }
 
-pub fn authorize(cookie: &str, jwt_secret: &str, role: Role) -> bool {
-    let token = match cookie_value(cookie, "token") {
-        Some(token) => token,
-        None => return false,
-    };
-
+pub fn authorize(token: &str, jwt_secret: &str, role: Role) -> bool {
     let is_valid = validate_token(token, jwt_secret);
 
     match role {
@@ -161,12 +162,7 @@ pub async fn login(db: &DbConn, request: LoginRequest) -> Result<Cookie> {
     Ok(cookie)
 }
 
-pub async fn logout(db: &DbConn, cookie: &str) -> Result<Cookie> {
-    let token = match cookie_value(cookie, "token") {
-        Some(token) => token,
-        None => return Err(Error::InvalidToken),
-    };
-
+pub async fn logout(db: &DbConn, token: &str) -> Result<Cookie> {
     let token_hash = blake3::hash(token.as_bytes()).to_hex().to_string();
 
     let token = Token::find()

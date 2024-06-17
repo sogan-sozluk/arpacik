@@ -22,7 +22,7 @@ pub async fn create_entry(
     headers: HeaderMap,
     json_data: Json<CreateEntryRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
-    let user_id = get_user_id_from_headers(&headers, &state.jwt_secret)
+    let user_id = get_user_id_from_headers(&headers, state.auth_from, &state.jwt_secret)
         .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
     match service::entry::create_entry(&state.conn, user_id, json_data.0).await {
         Ok(_) => Ok(StatusCode::CREATED),
@@ -35,7 +35,7 @@ pub async fn delete_entry(
     headers: HeaderMap,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
-    let user_id = get_user_id_from_headers(&headers, &state.jwt_secret)
+    let user_id = get_user_id_from_headers(&headers, state.auth_from, &state.jwt_secret)
         .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
     match service::entry::delete_entry(&state.conn, user_id, id, false).await {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
@@ -48,7 +48,7 @@ pub async fn soft_delete_entry(
     headers: HeaderMap,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
-    let user_id = get_user_id_from_headers(&headers, &state.jwt_secret)
+    let user_id = get_user_id_from_headers(&headers, state.auth_from, &state.jwt_secret)
         .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
     match service::entry::delete_entry(&state.conn, user_id, id, true).await {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
@@ -61,7 +61,7 @@ pub async fn recover_entry(
     headers: HeaderMap,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
-    let user_id = get_user_id_from_headers(&headers, &state.jwt_secret)
+    let user_id = get_user_id_from_headers(&headers, state.auth_from, &state.jwt_secret)
         .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
     match service::entry::recover_entry(&state.conn, user_id, id).await {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
@@ -107,7 +107,7 @@ pub async fn update_entry(
     Path(id): Path<i32>,
     json_data: Json<UpdateEntryRequest>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
-    let user_id = get_user_id_from_headers(&headers, &state.jwt_secret)
+    let user_id = get_user_id_from_headers(&headers, state.auth_from, &state.jwt_secret)
         .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
     match service::entry::update_entry(&state.conn, user_id, id, json_data.0).await {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
@@ -130,7 +130,7 @@ pub async fn favorite_entry(
     headers: HeaderMap,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
-    let user_id = get_user_id_from_headers(&headers, &state.jwt_secret)
+    let user_id = get_user_id_from_headers(&headers, state.auth_from, &state.jwt_secret)
         .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
     match service::entry::favorite_entry(&state.conn, user_id, id).await {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
@@ -143,7 +143,7 @@ pub async fn unfavorite_entry(
     headers: HeaderMap,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
-    let user_id = get_user_id_from_headers(&headers, &state.jwt_secret)
+    let user_id = get_user_id_from_headers(&headers, state.auth_from, &state.jwt_secret)
         .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
     match service::entry::unfavorite_entry(&state.conn, user_id, id).await {
         Ok(_) => Ok(StatusCode::NO_CONTENT),

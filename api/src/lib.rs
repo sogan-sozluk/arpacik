@@ -1,6 +1,9 @@
 use axum::Router;
 use migration::{Migrator, MigratorTrait};
-use service::sea_orm::{ConnectOptions, Database, DatabaseConnection};
+use service::{
+    auth::AuthHeader,
+    sea_orm::{ConnectOptions, Database, DatabaseConnection},
+};
 use std::env;
 
 mod error;
@@ -8,6 +11,13 @@ mod helper;
 mod middleware;
 mod route;
 mod traits;
+
+#[derive(Clone)]
+struct AppState {
+    conn: DatabaseConnection,
+    jwt_secret: String,
+    auth_from: AuthHeader,
+}
 
 #[tokio::main]
 async fn start() -> anyhow::Result<()> {
@@ -32,7 +42,21 @@ async fn start() -> anyhow::Result<()> {
 
     let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET is not set in .env file");
 
-    let state = AppState { conn, jwt_secret };
+    let auth_from = match env::var("AUTH_FROM")
+        .expect("AUTH_FROM is not set in .env file")
+        .as_str()
+    {
+        "cookie" => AuthHeader::Cookie,
+        "authorization" => AuthHeader::Authorization,
+        _ => AuthHeader::Cookie,
+    };
+
+    let state = AppState {
+        conn,
+        jwt_secret,
+        auth_from,
+    };
+
     let router = route::build(state);
     let app = Router::new().nest("/", router);
     let listener = tokio::net::TcpListener::bind(&server_url).await.unwrap();
@@ -40,12 +64,6 @@ async fn start() -> anyhow::Result<()> {
     axum::serve(listener, app).await?;
 
     Ok(())
-}
-
-#[derive(Clone)]
-struct AppState {
-    conn: DatabaseConnection,
-    jwt_secret: String,
 }
 
 pub fn main() {

@@ -10,6 +10,11 @@ pub struct LoginRequest {
     pub password: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LoginResponse {
+    pub token: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct RegisterRequest {
     #[validate(length(min = 2, max = 30))]
