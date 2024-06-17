@@ -13,6 +13,7 @@ pub struct EntryTitleDto {
 pub struct EntryAuthorDto {
     pub id: i32,
     pub nickname: String,
+    #[serde(rename = "isFaded")]
     pub is_faded: bool,
 }
 
@@ -23,7 +24,9 @@ pub struct EntryDto {
     pub title: EntryTitleDto,
     pub content: String,
     pub author: EntryAuthorDto,
+    #[serde(rename = "createdAt")]
     pub created_at: String,
+    #[serde(rename = "updatedAt")]
     pub updated_at: String,
 }
 
@@ -44,11 +47,13 @@ pub struct UpdateEntryRequest {
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct GetTitleEntriesQuery {
     #[validate(range(min = 1, max = 100))]
+    #[serde(rename = "perPage")]
     pub per_page: u8,
     #[validate(range(min = 0))]
     pub page: u8,
     pub from: Option<chrono::DateTime<chrono::Utc>>,
     pub to: Option<chrono::DateTime<chrono::Utc>>,
+    #[serde(rename = "orderBy")]
     pub order_by: Option<OrderBy>,
     pub order: Option<Order>,
 }

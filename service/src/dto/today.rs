@@ -5,5 +5,6 @@ use serde::{Deserialize, Serialize};
 pub struct TodayTitleDto {
     pub id: i32,
     pub name: String,
+    #[serde(rename = "entryCount")]
     pub entry_count: u64,
 }

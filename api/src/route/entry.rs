@@ -79,12 +79,12 @@ pub async fn get_entry(
     }
 }
 
-pub async fn get_title_entries(
+pub async fn get_title_entries_by_name(
     state: State<AppState>,
-    Path(id): Path<i32>,
+    Path(name): Path<String>,
     query: Query<GetTitleEntriesQuery>,
 ) -> Result<Json<PaginationResponse<EntryDto>>, (StatusCode, Json<ErrorBody>)> {
-    match service::entry::get_title_entries(&state.conn, id, query.0).await {
+    match service::entry::get_title_entries_by_name(&state.conn, &name, query.0).await {
         Ok(entries) => Ok(Json(entries)),
         Err(e) => Err(e.into_error_response()),
     }

@@ -4,6 +4,7 @@ use axum::{
     routing::{delete, get, patch, post},
     Router,
 };
+use tower_http::cors::CorsLayer;
 
 pub mod auth;
 pub mod entry;
@@ -23,7 +24,10 @@ pub fn build(state: AppState) -> Router {
         .route("/auth/login", post(auth::login))
         .route("/entries/:id", get(entry::get_entry))
         .route("/users/:id/entries", get(entry::get_user_entries))
-        .route("/titles/:id/entries", get(entry::get_title_entries))
+        .route(
+            "/titles/:name/entries",
+            get(entry::get_title_entries_by_name),
+        )
         .route("/today", get(today::today))
         .route("/trends", get(trends::trends))
         .route("/feed", get(feed::feed))
@@ -61,5 +65,7 @@ pub fn build(state: AppState) -> Router {
         .nest(prefix, public)
         .nest(prefix, user)
         .nest(prefix, moderator)
+        // TODO: Remove this once we have a proper frontend
+        .layer(CorsLayer::permissive())
         .with_state(state)
 }

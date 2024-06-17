@@ -358,6 +358,21 @@ pub async fn get_title_entries(
     })
 }
 
+pub async fn get_title_entries_by_name(
+    db: &DbConn,
+    title_name: &str,
+    query: GetTitleEntriesQuery,
+) -> Result<PaginationResponse<EntryDto>> {
+    let title = Title::find()
+        .filter(TitleColumn::Name.eq(title_name))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Başlık bulunamadı.".to_string()))
+        .and_then(|title| title.ok_or(Error::NotFound("Başlık bulunamadı.".to_string())))?;
+
+    get_title_entries(db, title.id, query).await
+}
+
 pub async fn get_user_entries(
     db: &DbConn,
     id: i32,

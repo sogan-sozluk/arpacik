@@ -6,6 +6,7 @@ pub struct PaginationQuery {
     #[validate(range(min = 0))]
     pub page: u8,
     #[validate(range(min = 1, max = 100))]
+    #[serde(rename = "perPage")]
     pub per_page: u8,
 }
 
@@ -13,6 +14,7 @@ pub struct PaginationQuery {
 pub struct PaginationResponse<T> {
     pub total: u64,
     pub page: u8,
+    #[serde(rename = "perPage")]
     pub per_page: u8,
     pub data: Vec<T>,
 }

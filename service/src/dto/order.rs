@@ -10,10 +10,10 @@ pub enum Order {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum OrderBy {
-    #[serde(rename = "created_at")]
+    #[serde(rename = "createdAt")]
     CreatedAt,
-    #[serde(rename = "updated_at")]
+    #[serde(rename = "updatedAt")]
     UpdatedAt,
-    #[serde(rename = "net_votes")]
+    #[serde(rename = "netVotes")]
     NetVotes,
 }
