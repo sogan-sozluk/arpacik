@@ -71,9 +71,11 @@ pub async fn recover_entry(
 
 pub async fn get_entry(
     state: State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<i32>,
 ) -> Result<Json<service::dto::entry::EntryDto>, (StatusCode, Json<ErrorBody>)> {
-    match service::entry::get_entry(&state.conn, id).await {
+    let user_id = get_user_id_from_headers(&headers, state.auth_from, &state.jwt_secret);
+    match service::entry::get_entry(&state.conn, id, user_id).await {
         Ok(entry) => Ok(Json(entry)),
         Err(e) => Err(e.into_error_response()),
     }
@@ -81,10 +83,12 @@ pub async fn get_entry(
 
 pub async fn get_title_entries_by_name(
     state: State<AppState>,
+    headers: HeaderMap,
     Path(name): Path<String>,
     query: Query<GetTitleEntriesQuery>,
 ) -> Result<Json<PaginationResponse<EntryDto>>, (StatusCode, Json<ErrorBody>)> {
-    match service::entry::get_title_entries_by_name(&state.conn, &name, query.0).await {
+    let user_id = get_user_id_from_headers(&headers, state.auth_from, &state.jwt_secret);
+    match service::entry::get_title_entries_by_name(&state.conn, &name, query.0, user_id).await {
         Ok(entries) => Ok(Json(entries)),
         Err(e) => Err(e.into_error_response()),
     }
@@ -92,10 +96,12 @@ pub async fn get_title_entries_by_name(
 
 pub async fn get_user_entries(
     state: State<AppState>,
-    Path(user_id): Path<i32>,
+    headers: HeaderMap,
+    Path(author_id): Path<i32>,
     query: Query<PaginationQuery>,
 ) -> Result<Json<PaginationResponse<EntryDto>>, (StatusCode, Json<ErrorBody>)> {
-    match service::entry::get_user_entries(&state.conn, user_id, query.0).await {
+    let user_id = get_user_id_from_headers(&headers, state.auth_from, &state.jwt_secret);
+    match service::entry::get_user_entries(&state.conn, author_id, query.0, user_id).await {
         Ok(entries) => Ok(Json(entries)),
         Err(e) => Err(e.into_error_response()),
     }

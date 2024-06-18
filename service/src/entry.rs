@@ -136,7 +136,7 @@ pub async fn recover_entry(db: &DbConn, user_id: i32, id: i32) -> Result<()> {
     Ok(())
 }
 
-pub async fn get_entry(db: &DbConn, id: i32) -> Result<EntryDto> {
+pub async fn get_entry(db: &DbConn, id: i32, user_id: Option<i32>) -> Result<EntryDto> {
     let entry = Entry::find()
         .filter(EntryColumn::Id.eq(id))
         .filter(EntryColumn::DeletedAt.is_null())
@@ -145,12 +145,41 @@ pub async fn get_entry(db: &DbConn, id: i32) -> Result<EntryDto> {
         .map_err(|_| Error::InternalError("Girdi bulunamadı.".to_string()))
         .and_then(|entry| entry.ok_or(Error::NotFound("Girdi bulunamadı.".to_string())))?;
 
-    let user = User::find()
+    let author = User::find()
         .filter(UserColumn::Id.eq(entry.user_id))
         .one(db)
         .await
         .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
         .and_then(|user| user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string())))?;
+
+    let user: Option<UserModel> = match user_id {
+        Some(user_id) => {
+            let user = User::find()
+                .filter(UserColumn::Id.eq(user_id))
+                .one(db)
+                .await
+                .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
+                .and_then(|user| {
+                    user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string()))
+                })?;
+
+            Some(user)
+        }
+        None => None,
+    };
+
+    let is_favorite: Option<bool> = match user {
+        Some(user) => Some(
+            Favorite::find()
+                .filter(FavoriteColumn::UserId.eq(user.id))
+                .filter(FavoriteColumn::EntryId.eq(entry.id))
+                .one(db)
+                .await
+                .map_err(|_| Error::InternalError("Favori bulunamadı.".to_string()))
+                .map(|favorite| favorite.is_some())?,
+        ),
+        None => None,
+    };
 
     let title = Title::find()
         .filter(TitleColumn::Id.eq(entry.title_id))
@@ -167,10 +196,12 @@ pub async fn get_entry(db: &DbConn, id: i32) -> Result<EntryDto> {
         },
         content: entry.content,
         author: EntryAuthorDto {
-            id: user.id,
-            nickname: user.nickname,
-            is_faded: user.is_faded,
+            id: author.id,
+            nickname: author.nickname,
+            is_faded: author.is_faded,
         },
+        is_favorite,
+        vote: None,
         created_at: entry.created_at.to_string(),
         updated_at: entry.updated_at.to_string(),
     })
@@ -242,11 +273,29 @@ pub async fn migrate_entry(db: &DbConn, id: i32, title_id: i32) -> Result<()> {
 pub async fn get_title_entries(
     db: &DbConn,
     id: i32,
+    user_id: Option<i32>,
     query: GetTitleEntriesQuery,
 ) -> Result<PaginationResponse<EntryDto>> {
     query.validate().map_err(|_| {
         Error::InvalidRequest("Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string())
     })?;
+
+    let user: Option<UserModel> = match user_id {
+        Some(user_id) => {
+            let user = User::find()
+                .filter(UserColumn::Id.eq(user_id))
+                .filter(UserColumn::DeletedAt.is_null())
+                .one(db)
+                .await
+                .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
+                .and_then(|user| {
+                    user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string()))
+                })?;
+
+            Some(user)
+        }
+        None => None,
+    };
 
     let base_query = Entry::find()
         .filter(EntryColumn::TitleId.eq(id))
@@ -307,16 +356,30 @@ pub async fn get_title_entries(
     let entry_dto_futures = entries.into_iter().map(|entry| {
         let db = db.clone();
         let title_name = title_name.clone();
+        let user = user.clone();
 
         async move {
-            let user = User::find()
+            let author = User::find()
                 .filter(UserColumn::Id.eq(entry.user_id))
                 .filter(UserColumn::DeletedAt.is_null())
                 .filter(UserColumn::IsFaded.eq(false))
                 .one(&db)
                 .await;
 
-            if let Ok(Some(user)) = user {
+            let is_favorite: Option<bool> = match user {
+                Some(user) => Some(
+                    Favorite::find()
+                        .filter(FavoriteColumn::UserId.eq(user.id))
+                        .filter(FavoriteColumn::EntryId.eq(entry.id))
+                        .one(&db)
+                        .await
+                        .map_err(|_| Error::InternalError("Favori bulunamadı.".to_string()))
+                        .map(|favorite| favorite.is_some())?,
+                ),
+                None => None,
+            };
+
+            if let Ok(Some(user)) = author {
                 Ok(Some(EntryDto {
                     id: entry.id,
                     title: EntryTitleDto {
@@ -329,6 +392,8 @@ pub async fn get_title_entries(
                         nickname: user.nickname,
                         is_faded: user.is_faded,
                     },
+                    is_favorite,
+                    vote: None,
                     created_at: entry.created_at.to_string(),
                     updated_at: entry.updated_at.to_string(),
                 }))
@@ -362,6 +427,7 @@ pub async fn get_title_entries_by_name(
     db: &DbConn,
     title_name: &str,
     query: GetTitleEntriesQuery,
+    user_id: Option<i32>,
 ) -> Result<PaginationResponse<EntryDto>> {
     let title = Title::find()
         .filter(TitleColumn::Name.eq(title_name))
@@ -370,17 +436,35 @@ pub async fn get_title_entries_by_name(
         .map_err(|_| Error::InternalError("Başlık bulunamadı.".to_string()))
         .and_then(|title| title.ok_or(Error::NotFound("Başlık bulunamadı.".to_string())))?;
 
-    get_title_entries(db, title.id, query).await
+    get_title_entries(db, title.id, user_id, query).await
 }
 
 pub async fn get_user_entries(
     db: &DbConn,
     id: i32,
     query: PaginationQuery,
+    user_id: Option<i32>,
 ) -> Result<PaginationResponse<EntryDto>> {
     query.validate().map_err(|_| {
         Error::InvalidRequest("Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string())
     })?;
+
+    let user: Option<UserModel> = match user_id {
+        Some(user_id) => {
+            let user = User::find()
+                .filter(UserColumn::Id.eq(user_id))
+                .filter(UserColumn::DeletedAt.is_null())
+                .one(db)
+                .await
+                .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
+                .and_then(|user| {
+                    user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string()))
+                })?;
+
+            Some(user)
+        }
+        None => None,
+    };
 
     let (nickname, is_faded): (String, bool) = User::find()
         .filter(UserColumn::Id.eq(id))
@@ -413,12 +497,26 @@ pub async fn get_user_entries(
     let entry_dto_futures = entries.into_iter().map(|entry| {
         let db = db.clone();
         let nickname = nickname.clone();
+        let user = user.clone();
 
         async move {
             let title = Title::find()
                 .filter(TitleColumn::Id.eq(entry.title_id))
                 .one(&db)
                 .await;
+
+            let is_favorite: Option<bool> = match user {
+                Some(user) => Some(
+                    Favorite::find()
+                        .filter(FavoriteColumn::UserId.eq(user.id))
+                        .filter(FavoriteColumn::EntryId.eq(entry.id))
+                        .one(&db)
+                        .await
+                        .map_err(|_| Error::InternalError("Favori bulunamadı.".to_string()))
+                        .map(|favorite| favorite.is_some())?,
+                ),
+                None => None,
+            };
 
             if let Ok(Some(title)) = title {
                 Ok(Some(EntryDto {
@@ -433,6 +531,8 @@ pub async fn get_user_entries(
                         nickname,
                         is_faded,
                     },
+                    is_favorite,
+                    vote: None,
                     created_at: entry.created_at.to_string(),
                     updated_at: entry.updated_at.to_string(),
                 }))
