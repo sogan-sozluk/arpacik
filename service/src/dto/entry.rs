@@ -18,12 +18,21 @@ pub struct EntryAuthorDto {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub enum Vote {
+    Up,
+    Down,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct EntryDto {
     // TODO: Add `is_title_visible`
     pub id: i32,
     pub title: EntryTitleDto,
     pub content: String,
     pub author: EntryAuthorDto,
+    #[serde(rename = "isFavorite")]
+    pub is_favorite: Option<bool>,
+    pub vote: Option<Vote>,
     #[serde(rename = "createdAt")]
     pub created_at: String,
     #[serde(rename = "updatedAt")]

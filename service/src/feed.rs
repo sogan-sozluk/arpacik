@@ -7,7 +7,24 @@ use crate::{
     Error, Result,
 };
 
-pub async fn feed(db: &DbConn) -> Result<Vec<EntryDto>> {
+pub async fn feed(db: &DbConn, user_id: Option<i32>) -> Result<Vec<EntryDto>> {
+    let user: Option<UserModel> = match user_id {
+        Some(user_id) => {
+            let user = User::find()
+                .filter(UserColumn::Id.eq(user_id))
+                .filter(UserColumn::DeletedAt.is_null())
+                .one(db)
+                .await
+                .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
+                .and_then(|user| {
+                    user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string()))
+                })?;
+
+            Some(user)
+        }
+        None => None,
+    };
+
     let select = Entry::find()
         .filter(EntryColumn::DeletedAt.is_null())
         .filter(EntryColumn::NetVotes.gt(0))
@@ -30,12 +47,26 @@ pub async fn feed(db: &DbConn) -> Result<Vec<EntryDto>> {
 
     let entry_dto_futures = entries.into_iter().map(|entry| {
         let db = db.clone();
+        let user = user.clone();
 
         async move {
             let title = Title::find()
                 .filter(TitleColumn::Id.eq(entry.title_id))
                 .one(&db)
                 .await;
+
+            let is_favorite: Option<bool> = match user {
+                Some(user) => Some(
+                    Favorite::find()
+                        .filter(FavoriteColumn::UserId.eq(user.id))
+                        .filter(FavoriteColumn::EntryId.eq(entry.id))
+                        .one(&db)
+                        .await
+                        .map_err(|_| Error::InternalError("Favori bulunamadı.".to_string()))
+                        .map(|favorite| favorite.is_some())?,
+                ),
+                None => None,
+            };
 
             let (author_id, author_nickname, author_is_faded): (i32, String, bool) = User::find()
                 .select_only()
@@ -64,6 +95,8 @@ pub async fn feed(db: &DbConn) -> Result<Vec<EntryDto>> {
                         nickname: author_nickname,
                         is_faded: author_is_faded,
                     },
+                    is_favorite,
+                    vote: None,
                     created_at: entry.created_at.to_string(),
                     updated_at: entry.updated_at.to_string(),
                 }))
