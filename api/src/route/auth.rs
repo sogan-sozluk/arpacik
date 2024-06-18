@@ -22,15 +22,10 @@ pub async fn login(
     json_data: Json<LoginRequest>,
 ) -> Result<(HeaderMap, Json<LoginResponse>), (StatusCode, Json<ErrorBody>)> {
     match service::auth::login(&state.conn, json_data.0).await {
-        Ok(cookie) => {
+        Ok(resp) => {
             let mut headers = HeaderMap::new();
-            headers.insert(SET_COOKIE, cookie.to_string().parse().unwrap());
-            Ok((
-                headers,
-                Json(LoginResponse {
-                    token: cookie.value,
-                }),
-            ))
+            headers.insert(SET_COOKIE, resp.cookie.to_string().parse().unwrap());
+            Ok((headers, Json(resp)))
         }
         Err(e) => Err(e.into_error_response()),
     }
