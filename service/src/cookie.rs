@@ -1,4 +1,6 @@
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Cookie {
     pub name: String,
     pub value: String,

@@ -1,7 +1,7 @@
 use std::env;
 
 use crate::cookie::Cookie;
-use crate::dto::auth::{LoginRequest, RegisterRequest};
+use crate::dto::auth::{LoginRequest, LoginResponse, RegisterRequest};
 use crate::token::{is_admin, is_moderator, validate_token, UserClaims};
 use crate::{Error, Result};
 use ::entity::prelude::*;
@@ -75,7 +75,7 @@ pub async fn register(db: &DbConn, request: RegisterRequest) -> Result<UserActiv
     }
 }
 
-pub async fn login(db: &DbConn, request: LoginRequest) -> Result<Cookie> {
+pub async fn login(db: &DbConn, request: LoginRequest) -> Result<LoginResponse> {
     match request.validate() {
         Ok(_) => (),
         Err(_) => {
@@ -159,7 +159,14 @@ pub async fn login(db: &DbConn, request: LoginRequest) -> Result<Cookie> {
         .http_only(true)
         .secure(true);
 
-    Ok(cookie)
+    let response = LoginResponse {
+        cookie,
+        token,
+        is_admin: user.is_admin,
+        is_moderator: user.is_moderator,
+    };
+
+    Ok(response)
 }
 
 pub async fn logout(db: &DbConn, token: &str) -> Result<Cookie> {

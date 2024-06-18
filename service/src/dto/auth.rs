@@ -1,4 +1,4 @@
-use crate::validation::validate_password;
+use crate::{cookie::Cookie, validation::validate_password};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
@@ -12,7 +12,10 @@ pub struct LoginRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginResponse {
+    pub cookie: Cookie,
     pub token: String,
+    pub is_admin: bool,
+    pub is_moderator: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
