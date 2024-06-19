@@ -97,8 +97,10 @@ pub async fn feed(db: &DbConn, user_id: Option<i32>) -> Result<Vec<EntryDto>> {
                     },
                     is_favorite,
                     vote: None,
-                    created_at: entry.created_at.to_string(),
-                    updated_at: entry.updated_at.to_string(),
+                    created_at: entry.created_at.format("%Y-%m-%d %H:%M").to_string(),
+                    updated_at: entry
+                        .updated_at
+                        .map(|t| t.format("%Y-%m-%d %H:%M").to_string()),
                 }))
             } else {
                 Ok(None)

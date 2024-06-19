@@ -60,7 +60,7 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(User::UpdatedAt)
                             .timestamp()
-                            .not_null()
+                            .null()
                             .default(current_timestamp_utc()),
                     )
                     .col(ColumnDef::new(User::DeletedAt).timestamp().null())
@@ -172,7 +172,7 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(Entry::UpdatedAt)
                             .timestamp()
-                            .not_null()
+                            .null()
                             .default(current_timestamp_utc()),
                     )
                     .col(ColumnDef::new(Entry::DeletedAt).timestamp().null())
