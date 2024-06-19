@@ -57,12 +57,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(current_timestamp_utc()),
                     )
-                    .col(
-                        ColumnDef::new(User::UpdatedAt)
-                            .timestamp()
-                            .null()
-                            .default(current_timestamp_utc()),
-                    )
+                    .col(ColumnDef::new(User::UpdatedAt).timestamp().null())
                     .col(ColumnDef::new(User::DeletedAt).timestamp().null())
                     .to_owned(),
             )
@@ -169,12 +164,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(current_timestamp_utc()),
                     )
-                    .col(
-                        ColumnDef::new(Entry::UpdatedAt)
-                            .timestamp()
-                            .null()
-                            .default(current_timestamp_utc()),
-                    )
+                    .col(ColumnDef::new(Entry::UpdatedAt).timestamp().null())
                     .col(ColumnDef::new(Entry::DeletedAt).timestamp().null())
                     .foreign_key(
                         ForeignKey::create()
