@@ -15,7 +15,7 @@ pub struct Model {
     pub net_votes: i32,
     pub total_favorites: i32,
     pub created_at: DateTime,
-    pub updated_at: DateTime,
+    pub updated_at: Option<DateTime>,
     pub deleted_at: Option<DateTime>,
 }
 

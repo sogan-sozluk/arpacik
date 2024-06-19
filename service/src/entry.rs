@@ -202,8 +202,10 @@ pub async fn get_entry(db: &DbConn, id: i32, user_id: Option<i32>) -> Result<Ent
         },
         is_favorite,
         vote: None,
-        created_at: entry.created_at.to_string(),
-        updated_at: entry.updated_at.to_string(),
+        created_at: entry.created_at.format("%Y-%m-%d %H:%M").to_string(),
+        updated_at: entry
+            .updated_at
+            .map(|t| t.format("%Y-%m-%d %H:%M").to_string()),
     })
 }
 
@@ -233,7 +235,7 @@ pub async fn update_entry(
 
     let mut entry: EntryActiveModel = entry.into();
     entry.content = Set(request.content);
-    entry.updated_at = Set(chrono::Utc::now().naive_utc());
+    entry.updated_at = Set(Some(chrono::Utc::now().naive_utc()));
 
     entry
         .save(db)
@@ -394,8 +396,10 @@ pub async fn get_title_entries(
                     },
                     is_favorite,
                     vote: None,
-                    created_at: entry.created_at.to_string(),
-                    updated_at: entry.updated_at.to_string(),
+                    created_at: entry.created_at.format("%Y-%m-%d %H:%M").to_string(),
+                    updated_at: entry
+                        .updated_at
+                        .map(|t| t.format("%Y-%m-%d %H:%M").to_string()),
                 }))
             } else {
                 Ok(None)
@@ -533,8 +537,10 @@ pub async fn get_user_entries(
                     },
                     is_favorite,
                     vote: None,
-                    created_at: entry.created_at.to_string(),
-                    updated_at: entry.updated_at.to_string(),
+                    created_at: entry.created_at.format("%Y-%m-%d %H:%M").to_string(),
+                    updated_at: entry
+                        .updated_at
+                        .map(|t| t.format("%Y-%m-%d %H:%M").to_string()),
                 }))
             } else {
                 Ok(None)

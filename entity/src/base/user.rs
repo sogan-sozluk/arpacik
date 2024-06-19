@@ -17,7 +17,7 @@ pub struct Model {
     pub is_moderator: bool,
     pub is_faded: bool,
     pub created_at: DateTime,
-    pub updated_at: DateTime,
+    pub updated_at: Option<DateTime>,
     pub deleted_at: Option<DateTime>,
 }
 
