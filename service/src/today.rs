@@ -72,6 +72,6 @@ pub async fn today(
         total,
         per_page: query.per_page,
         page: query.page,
-        data: today_dtos,
+        items: today_dtos,
     })
 }
