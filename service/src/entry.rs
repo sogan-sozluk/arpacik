@@ -425,7 +425,7 @@ pub async fn get_title_entries(
         total,
         page: query.page,
         per_page: query.per_page,
-        data: entry_dtos,
+        items: entry_dtos,
     })
 }
 
@@ -564,7 +564,7 @@ pub async fn get_user_entries(
         total,
         page: query.page,
         per_page: query.per_page,
-        data: entry_dtos,
+        items: entry_dtos,
     })
 }
 

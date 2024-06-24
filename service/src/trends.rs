@@ -68,6 +68,6 @@ pub async fn trends(
         total,
         page: query.page,
         per_page: query.per_page,
-        data: trend_dtos,
+        items: trend_dtos,
     })
 }

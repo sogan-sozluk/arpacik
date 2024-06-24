@@ -16,5 +16,5 @@ pub struct PaginationResponse<T> {
     pub page: u8,
     #[serde(rename = "perPage")]
     pub per_page: u8,
-    pub data: Vec<T>,
+    pub items: Vec<T>,
 }
