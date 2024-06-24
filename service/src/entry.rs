@@ -5,8 +5,8 @@ use validator::Validate;
 use crate::{
     dto::{
         entry::{
-            CreateEntryRequest, EntryAuthorDto, EntryDto, EntryTitleDto, GetTitleEntriesQuery,
-            UpdateEntryRequest,
+            CreateEntryRequest, CreateEntryResponse, EntryAuthorDto, EntryDto, EntryTitleDto,
+            GetTitleEntriesQuery, UpdateEntryRequest,
         },
         order::{self, OrderBy},
         pagination::{PaginationQuery, PaginationResponse},
@@ -15,7 +15,11 @@ use crate::{
     Error, Result,
 };
 
-pub async fn create_entry(db: &DbConn, user_id: i32, request: CreateEntryRequest) -> Result<()> {
+pub async fn create_entry(
+    db: &DbConn,
+    user_id: i32,
+    request: CreateEntryRequest,
+) -> Result<CreateEntryResponse> {
     request.validate().map_err(|_| {
         Error::InvalidRequest("Geçersiz istek. Lütfen girilen bilgileri kontrol edin.".to_string())
     })?;
@@ -58,7 +62,7 @@ pub async fn create_entry(db: &DbConn, user_id: i32, request: CreateEntryRequest
         .await
         .map_err(|_| Error::InternalError("Başlık güncellenemedi.".to_string()))?;
 
-    EntryActiveModel {
+    let entry = EntryActiveModel {
         title_id: Set(title_id),
         user_id: Set(user_id),
         content: Set(request.content),
@@ -73,7 +77,9 @@ pub async fn create_entry(db: &DbConn, user_id: i32, request: CreateEntryRequest
         Error::InternalError("Girdi oluşturulamadı.".to_string())
     })?;
 
-    Ok(())
+    Ok(CreateEntryResponse {
+        id: entry.id.unwrap(),
+    })
 }
 
 pub async fn delete_entry(db: &DbConn, user_id: i32, id: i32, soft_delete: bool) -> Result<()> {

@@ -5,7 +5,10 @@ use axum::{
 };
 use service::{
     dto::{
-        entry::{CreateEntryRequest, EntryDto, GetTitleEntriesQuery, UpdateEntryRequest},
+        entry::{
+            CreateEntryRequest, CreateEntryResponse, EntryDto, GetTitleEntriesQuery,
+            UpdateEntryRequest,
+        },
         pagination::{PaginationQuery, PaginationResponse},
     },
     Error,
@@ -21,11 +24,11 @@ pub async fn create_entry(
     state: State<AppState>,
     headers: HeaderMap,
     json_data: Json<CreateEntryRequest>,
-) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
+) -> Result<Json<CreateEntryResponse>, (StatusCode, Json<ErrorBody>)> {
     let user_id = get_user_id_from_headers(&headers, state.auth_from, &state.jwt_secret)
         .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
     match service::entry::create_entry(&state.conn, user_id, json_data.0).await {
-        Ok(_) => Ok(StatusCode::CREATED),
+        Ok(r) => Ok(Json(r)),
         Err(e) => Err(e.into_error_response()),
     }
 }
