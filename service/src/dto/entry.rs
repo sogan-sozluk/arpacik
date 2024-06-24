@@ -48,6 +48,11 @@ pub struct CreateEntryRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
+pub struct CreateEntryResponse {
+    pub id: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct UpdateEntryRequest {
     #[validate(length(min = 1, max = 65535))]
     pub content: String,
