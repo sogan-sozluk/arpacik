@@ -3,7 +3,7 @@ use validator::Validate;
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct PaginationQuery {
-    #[validate(range(min = 0))]
+    #[validate(range(min = 1))]
     pub page: u8,
     #[validate(range(min = 1, max = 100))]
     #[serde(rename = "perPage")]
