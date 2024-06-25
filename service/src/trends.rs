@@ -46,7 +46,7 @@ pub async fn trends(
     let title_pages = base_query.paginate(db, query.per_page.into());
 
     let titles = title_pages
-        .fetch_page(query.page.into())
+        .fetch_page(query.page as u64 - 1)
         .await
         .map_err(|_| Error::InternalError("Başlıklar getirilemedi.".to_string()))?;
 

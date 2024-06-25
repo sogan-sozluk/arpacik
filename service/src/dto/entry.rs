@@ -63,7 +63,7 @@ pub struct GetTitleEntriesQuery {
     #[validate(range(min = 1, max = 100))]
     #[serde(rename = "perPage")]
     pub per_page: u8,
-    #[validate(range(min = 0))]
+    #[validate(range(min = 1))]
     pub page: u8,
     pub from: Option<chrono::DateTime<chrono::Utc>>,
     pub to: Option<chrono::DateTime<chrono::Utc>>,

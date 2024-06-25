@@ -342,7 +342,7 @@ pub async fn get_title_entries(
     let entry_pages = base_query.clone().paginate(db, query.per_page.into());
 
     let entries = entry_pages
-        .fetch_page(query.page.into())
+        .fetch_page(query.page as u64 - 1)
         .await
         .map_err(|_| Error::InternalError("Girdiler getirilemedi.".to_string()))?;
 
@@ -496,7 +496,7 @@ pub async fn get_user_entries(
         .paginate(db, query.per_page.into());
 
     let entries = entry_pages
-        .fetch_page(query.page.into())
+        .fetch_page(query.page as u64 - 1)
         .await
         .map_err(|_| Error::InternalError("Girdiler getirilemedi.".to_string()))?;
 
