@@ -3,6 +3,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
     Json,
 };
+use entity::prelude::Rating;
 use service::{
     dto::{
         entry::{
@@ -160,27 +161,14 @@ pub async fn unfavorite_entry(
     }
 }
 
-pub async fn upvote(
+pub async fn vote_entry(
     state: State<AppState>,
     headers: HeaderMap,
-    Path(id): Path<i32>,
+    Path((id, rating)): Path<(i32, Rating)>,
 ) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
     let user_id = get_user_id_from_headers(&headers, state.auth_from, &state.jwt_secret)
         .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
-    match service::entry::upvote(&state.conn, user_id, id).await {
-        Ok(_) => Ok(StatusCode::NO_CONTENT),
-        Err(e) => Err(e.into_error_response()),
-    }
-}
-
-pub async fn downvote(
-    state: State<AppState>,
-    headers: HeaderMap,
-    Path(id): Path<i32>,
-) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
-    let user_id = get_user_id_from_headers(&headers, state.auth_from, &state.jwt_secret)
-        .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
-    match service::entry::downvote(&state.conn, user_id, id).await {
+    match service::entry::vote_entry(&state.conn, user_id, id, rating).await {
         Ok(_) => Ok(StatusCode::NO_CONTENT),
         Err(e) => Err(e.into_error_response()),
     }
