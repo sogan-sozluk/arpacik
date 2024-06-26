@@ -659,3 +659,198 @@ pub async fn unfavorite_entry(db: &DbConn, user_id: i32, entry_id: i32) -> Resul
 
     Ok(())
 }
+
+pub async fn upvote(db: &DbConn, user_id: i32, entry_id: i32) -> Result<()> {
+    let mut entry = Entry::find()
+        .filter(EntryColumn::Id.eq(entry_id))
+        .filter(EntryColumn::DeletedAt.is_null())
+        .inner_join(Title)
+        .filter(TitleColumn::IsVisible.eq(true))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Girdi bulunamadı.".to_string()))
+        .and_then(|entry| entry.ok_or(Error::NotFound("Girdi bulunamadı.".to_string())))?
+        .into_active_model();
+
+    // TODO: Check if user silenced
+    User::find()
+        .filter(UserColumn::Id.eq(user_id))
+        .filter(UserColumn::DeletedAt.is_null())
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
+        .and_then(|user| user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string())))?;
+
+    let vote = Vote::find()
+        .filter(VoteColumn::UserId.eq(user_id))
+        .filter(VoteColumn::EntryId.eq(entry_id))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Oy bulunamadı.".to_string()))?;
+
+    match vote {
+        Some(vote) => {
+            if vote.rating == Rating::Up {
+                return Err(Error::InvalidRequest(
+                    "Zaten olumlu oy verilmiş.".to_string(),
+                ));
+            }
+
+            let mut vote = vote.into_active_model();
+            vote.rating = Set(Rating::Up);
+
+            vote.save(db)
+                .await
+                .map_err(|_| Error::InternalError("Oy güncellenemedi.".to_string()))?;
+
+            entry.net_votes = Set(entry.net_votes.unwrap() + 2);
+            entry
+                .save(db)
+                .await
+                .map_err(|_| Error::InternalError("Oy güncellenemedi.".to_string()))?;
+
+            Ok(())
+        }
+        None => {
+            VoteActiveModel {
+                user_id: Set(user_id),
+                entry_id: Set(entry_id),
+                rating: Set(Rating::Up),
+                ..Default::default()
+            }
+            .save(db)
+            .await
+            .map_err(|_| Error::InternalError("Oy eklenemedi.".to_string()))?;
+
+            entry.net_votes = Set(entry.net_votes.unwrap() + 1);
+            entry
+                .save(db)
+                .await
+                .map_err(|_| Error::InternalError("Oy eklenemedi.".to_string()))?;
+
+            Ok(())
+        }
+    }
+}
+
+pub async fn downvote(db: &DbConn, user_id: i32, entry_id: i32) -> Result<()> {
+    let mut entry = Entry::find()
+        .filter(EntryColumn::Id.eq(entry_id))
+        .filter(EntryColumn::DeletedAt.is_null())
+        .inner_join(Title)
+        .filter(TitleColumn::IsVisible.eq(true))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Girdi bulunamadı.".to_string()))
+        .and_then(|entry| entry.ok_or(Error::NotFound("Girdi bulunamadı.".to_string())))?
+        .into_active_model();
+
+    User::find()
+        .filter(UserColumn::Id.eq(user_id))
+        .filter(UserColumn::DeletedAt.is_null())
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
+        .and_then(|user| user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string())))?;
+
+    let vote = Vote::find()
+        .filter(VoteColumn::UserId.eq(user_id))
+        .filter(VoteColumn::EntryId.eq(entry_id))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Oy bulunamadı.".to_string()))?;
+
+    match vote {
+        Some(vote) => {
+            if vote.rating == Rating::Down {
+                return Err(Error::InvalidRequest(
+                    "Zaten olumsuz oy verilmiş.".to_string(),
+                ));
+            }
+
+            let mut vote = vote.into_active_model();
+            vote.rating = Set(Rating::Down);
+
+            vote.save(db)
+                .await
+                .map_err(|_| Error::InternalError("Oy güncellenemedi.".to_string()))?;
+
+            entry.net_votes = Set(entry.net_votes.unwrap() - 2);
+            entry
+                .save(db)
+                .await
+                .map_err(|_| Error::InternalError("Oy güncellenemedi.".to_string()))?;
+
+            Ok(())
+        }
+        None => {
+            VoteActiveModel {
+                user_id: Set(user_id),
+                entry_id: Set(entry_id),
+                rating: Set(Rating::Down),
+                ..Default::default()
+            }
+            .save(db)
+            .await
+            .map_err(|_| Error::InternalError("Oy eklenemedi.".to_string()))?;
+
+            entry.net_votes = Set(entry.net_votes.unwrap() - 1);
+            entry
+                .save(db)
+                .await
+                .map_err(|_| Error::InternalError("Oy eklenemedi.".to_string()))?;
+
+            Ok(())
+        }
+    }
+}
+
+pub async fn unvote(db: &DbConn, user_id: i32, entry_id: i32) -> Result<()> {
+    let mut entry = Entry::find()
+        .filter(EntryColumn::Id.eq(entry_id))
+        .filter(EntryColumn::DeletedAt.is_null())
+        .inner_join(Title)
+        .filter(TitleColumn::IsVisible.eq(true))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Girdi bulunamadı.".to_string()))
+        .and_then(|entry| entry.ok_or(Error::NotFound("Girdi bulunamadı.".to_string())))?
+        .into_active_model();
+
+    User::find()
+        .filter(UserColumn::Id.eq(user_id))
+        .filter(UserColumn::DeletedAt.is_null())
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
+        .and_then(|user| user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string())))?;
+
+    let vote = Vote::find()
+        .filter(VoteColumn::UserId.eq(user_id))
+        .filter(VoteColumn::EntryId.eq(entry_id))
+        .one(db)
+        .await
+        .map_err(|_| Error::InternalError("Oy bulunamadı.".to_string()))?;
+
+    match vote {
+        Some(vote) => {
+            entry.net_votes = Set(entry.net_votes.unwrap()
+                - match vote.rating {
+                    Rating::Up => 1,
+                    Rating::Down => -1,
+                });
+
+            vote.delete(db)
+                .await
+                .map_err(|_| Error::InternalError("Oy silinemedi.".to_string()))?;
+
+            entry
+                .save(db)
+                .await
+                .map_err(|_| Error::InternalError("Oy silinemedi.".to_string()))?;
+
+            Ok(())
+        }
+        None => Err(Error::InvalidRequest("Oy bulunamadı.".to_string())),
+    }
+}

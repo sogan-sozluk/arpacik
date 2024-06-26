@@ -1,3 +1,4 @@
+use extension::postgres::Type;
 use sea_orm_migration::prelude::*;
 
 use crate::helper::current_timestamp_utc;
@@ -8,6 +9,15 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_type(
+                Type::create()
+                    .as_enum(Alias::new("rating"))
+                    .values([Alias::new("Up"), Alias::new("Down")])
+                    .to_owned(),
+            )
+            .await?;
+
         manager
             .create_table(
                 Table::create()
@@ -185,69 +195,39 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(Upvote::Table)
+                    .table(Vote::Table)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(Upvote::Id)
+                        ColumnDef::new(Vote::Id)
                             .integer()
                             .not_null()
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Upvote::EntryId).integer().not_null())
-                    .col(ColumnDef::new(Upvote::UserId).integer().not_null())
                     .col(
-                        ColumnDef::new(Upvote::CreatedAt)
+                        ColumnDef::new(Vote::Rating)
+                            .custom(Alias::new("rating"))
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Vote::EntryId).integer().not_null())
+                    .col(ColumnDef::new(Vote::UserId).integer().not_null())
+                    .col(
+                        ColumnDef::new(Vote::CreatedAt)
                             .timestamp()
                             .not_null()
                             .default(current_timestamp_utc()),
                     )
+                    .col(ColumnDef::new(Vote::UpdatedAt).timestamp().null())
                     .foreign_key(
                         ForeignKey::create()
-                            .name("fk-upvote-entry_id")
-                            .from(Upvote::Table, Upvote::EntryId)
+                            .name("fk-vote-entry_id")
+                            .from(Vote::Table, Vote::EntryId)
                             .to(Entry::Table, Entry::Id),
                     )
                     .foreign_key(
                         ForeignKey::create()
-                            .name("fk-upvote-user_id")
-                            .from(Upvote::Table, Upvote::UserId)
-                            .to(User::Table, User::Id),
-                    )
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .create_table(
-                Table::create()
-                    .table(Downvote::Table)
-                    .if_not_exists()
-                    .col(
-                        ColumnDef::new(Downvote::Id)
-                            .integer()
-                            .not_null()
-                            .auto_increment()
-                            .primary_key(),
-                    )
-                    .col(ColumnDef::new(Downvote::EntryId).integer().not_null())
-                    .col(ColumnDef::new(Downvote::UserId).integer().not_null())
-                    .col(
-                        ColumnDef::new(Downvote::CreatedAt)
-                            .timestamp()
-                            .not_null()
-                            .default(current_timestamp_utc()),
-                    )
-                    .foreign_key(
-                        ForeignKey::create()
-                            .name("fk-downvote-entry_id")
-                            .from(Downvote::Table, Downvote::EntryId)
-                            .to(Entry::Table, Entry::Id),
-                    )
-                    .foreign_key(
-                        ForeignKey::create()
-                            .name("fk-downvote-user_id")
-                            .from(Downvote::Table, Downvote::UserId)
+                            .name("fk-vote-user_id")
+                            .from(Vote::Table, Vote::UserId)
                             .to(User::Table, User::Id),
                     )
                     .to_owned(),
@@ -326,15 +306,15 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
+            .drop_table(Table::drop().table(Token::Table).to_owned())
+            .await?;
+
+        manager
             .drop_table(Table::drop().table(Favorite::Table).to_owned())
             .await?;
 
         manager
-            .drop_table(Table::drop().table(Downvote::Table).to_owned())
-            .await?;
-
-        manager
-            .drop_table(Table::drop().table(Upvote::Table).to_owned())
+            .drop_table(Table::drop().table(Vote::Table).to_owned())
             .await?;
 
         manager
@@ -346,15 +326,15 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
-            .drop_table(Table::drop().table(Token::Table).to_owned())
-            .await?;
-
-        manager
             .drop_table(Table::drop().table(SilencedUser::Table).to_owned())
             .await?;
 
         manager
             .drop_table(Table::drop().table(User::Table).to_owned())
+            .await?;
+
+        manager
+            .drop_type(Type::drop().name(Alias::new("rating")).to_owned())
             .await?;
 
         Ok(())
@@ -409,21 +389,14 @@ enum Entry {
 }
 
 #[derive(DeriveIden)]
-enum Upvote {
+enum Vote {
     Table,
     Id,
+    Rating,
     EntryId,
     UserId,
     CreatedAt,
-}
-
-#[derive(DeriveIden)]
-enum Downvote {
-    Table,
-    Id,
-    EntryId,
-    UserId,
-    CreatedAt,
+    UpdatedAt,
 }
 
 #[derive(DeriveIden)]

@@ -2,11 +2,11 @@
 
 pub mod prelude;
 
-pub mod downvote;
 pub mod entry;
 pub mod favorite;
+pub mod sea_orm_active_enums;
 pub mod silenced_user;
 pub mod title;
 pub mod token;
-pub mod upvote;
 pub mod user;
+pub mod vote;
