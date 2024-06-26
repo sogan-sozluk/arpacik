@@ -1,3 +1,4 @@
+use entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
@@ -18,12 +19,6 @@ pub struct EntryAuthorDto {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum Vote {
-    Up,
-    Down,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct EntryDto {
     // TODO: Add `is_title_visible`
     pub id: i32,
@@ -32,7 +27,7 @@ pub struct EntryDto {
     pub author: EntryAuthorDto,
     #[serde(rename = "isFavorite")]
     pub is_favorite: Option<bool>,
-    pub vote: Option<Vote>,
+    pub vote: Option<Rating>,
     #[serde(rename = "createdAt")]
     pub created_at: String,
     #[serde(rename = "updatedAt")]
