@@ -42,6 +42,9 @@ pub fn build(state: AppState) -> Router {
         .route("/entries/:id", patch(entry::update_entry))
         .route("/entries/:id/favorite", post(entry::favorite_entry))
         .route("/entries/:id/unfavorite", post(entry::unfavorite_entry))
+        .route("/entries/:id/upvote", post(entry::upvote))
+        .route("/entries/:id/downvote", post(entry::downvote))
+        .route("/entries/:id/unvote", post(entry::unvote_entry))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth::auth,

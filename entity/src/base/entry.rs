@@ -21,8 +21,6 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::downvote::Entity")]
-    Downvote,
     #[sea_orm(has_many = "super::favorite::Entity")]
     Favorite,
     #[sea_orm(
@@ -33,8 +31,6 @@ pub enum Relation {
         on_delete = "NoAction"
     )]
     Title,
-    #[sea_orm(has_many = "super::upvote::Entity")]
-    Upvote,
     #[sea_orm(
         belongs_to = "super::user::Entity",
         from = "Column::UserId",
@@ -43,12 +39,8 @@ pub enum Relation {
         on_delete = "NoAction"
     )]
     User,
-}
-
-impl Related<super::downvote::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Downvote.def()
-    }
+    #[sea_orm(has_many = "super::vote::Entity")]
+    Vote,
 }
 
 impl Related<super::favorite::Entity> for Entity {
@@ -63,15 +55,15 @@ impl Related<super::title::Entity> for Entity {
     }
 }
 
-impl Related<super::upvote::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Upvote.def()
-    }
-}
-
 impl Related<super::user::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::User.def()
+    }
+}
+
+impl Related<super::vote::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Vote.def()
     }
 }
 

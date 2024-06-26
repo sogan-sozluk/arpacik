@@ -159,3 +159,42 @@ pub async fn unfavorite_entry(
         Err(e) => Err(e.into_error_response()),
     }
 }
+
+pub async fn upvote(
+    state: State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<i32>,
+) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
+    let user_id = get_user_id_from_headers(&headers, state.auth_from, &state.jwt_secret)
+        .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
+    match service::entry::upvote(&state.conn, user_id, id).await {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => Err(e.into_error_response()),
+    }
+}
+
+pub async fn downvote(
+    state: State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<i32>,
+) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
+    let user_id = get_user_id_from_headers(&headers, state.auth_from, &state.jwt_secret)
+        .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
+    match service::entry::downvote(&state.conn, user_id, id).await {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => Err(e.into_error_response()),
+    }
+}
+
+pub async fn unvote_entry(
+    state: State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<i32>,
+) -> Result<StatusCode, (StatusCode, Json<ErrorBody>)> {
+    let user_id = get_user_id_from_headers(&headers, state.auth_from, &state.jwt_secret)
+        .ok_or(Error::Unauthorized("Geçersiz çerez".to_string()).into_error_response())?;
+    match service::entry::unvote(&state.conn, user_id, id).await {
+        Ok(_) => Ok(StatusCode::NO_CONTENT),
+        Err(e) => Err(e.into_error_response()),
+    }
+}
