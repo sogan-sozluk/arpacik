@@ -175,7 +175,7 @@ pub async fn get_entry(db: &DbConn, id: i32, user_id: Option<i32>) -> Result<Ent
     };
 
     let is_favorite: Option<bool> = match user {
-        Some(user) => Some(
+        Some(ref user) => Some(
             Favorite::find()
                 .filter(FavoriteColumn::UserId.eq(user.id))
                 .filter(FavoriteColumn::EntryId.eq(entry.id))
@@ -184,6 +184,17 @@ pub async fn get_entry(db: &DbConn, id: i32, user_id: Option<i32>) -> Result<Ent
                 .map_err(|_| Error::InternalError("Favori bulunamadı.".to_string()))
                 .map(|favorite| favorite.is_some())?,
         ),
+        None => None,
+    };
+
+    let vote: Option<Rating> = match user {
+        Some(user) => Vote::find()
+            .filter(VoteColumn::UserId.eq(user.id))
+            .filter(VoteColumn::EntryId.eq(entry.id))
+            .one(db)
+            .await
+            .map_err(|_| Error::InternalError("Oy bulunamadı.".to_string()))
+            .map(|vote| vote.map(|vote| vote.rating))?,
         None => None,
     };
 
@@ -207,7 +218,7 @@ pub async fn get_entry(db: &DbConn, id: i32, user_id: Option<i32>) -> Result<Ent
             is_faded: author.is_faded,
         },
         is_favorite,
-        vote: None,
+        vote,
         created_at: entry.created_at.and_utc().to_string(),
         updated_at: entry.updated_at.map(|t| t.and_utc().to_string()),
     })
@@ -373,7 +384,7 @@ pub async fn get_title_entries(
                 .await;
 
             let is_favorite: Option<bool> = match user {
-                Some(user) => Some(
+                Some(ref user) => Some(
                     Favorite::find()
                         .filter(FavoriteColumn::UserId.eq(user.id))
                         .filter(FavoriteColumn::EntryId.eq(entry.id))
@@ -382,6 +393,17 @@ pub async fn get_title_entries(
                         .map_err(|_| Error::InternalError("Favori bulunamadı.".to_string()))
                         .map(|favorite| favorite.is_some())?,
                 ),
+                None => None,
+            };
+
+            let vote: Option<Rating> = match user {
+                Some(user) => Vote::find()
+                    .filter(VoteColumn::UserId.eq(user.id))
+                    .filter(VoteColumn::EntryId.eq(entry.id))
+                    .one(&db)
+                    .await
+                    .map_err(|_| Error::InternalError("Oy bulunamadı.".to_string()))
+                    .map(|vote| vote.map(|vote| vote.rating))?,
                 None => None,
             };
 
@@ -399,7 +421,7 @@ pub async fn get_title_entries(
                         is_faded: user.is_faded,
                     },
                     is_favorite,
-                    vote: None,
+                    vote,
                     created_at: entry.created_at.and_utc().to_string(),
                     updated_at: entry.updated_at.map(|t| t.and_utc().to_string()),
                 }))
@@ -512,7 +534,7 @@ pub async fn get_user_entries(
                 .await;
 
             let is_favorite: Option<bool> = match user {
-                Some(user) => Some(
+                Some(ref user) => Some(
                     Favorite::find()
                         .filter(FavoriteColumn::UserId.eq(user.id))
                         .filter(FavoriteColumn::EntryId.eq(entry.id))
@@ -521,6 +543,17 @@ pub async fn get_user_entries(
                         .map_err(|_| Error::InternalError("Favori bulunamadı.".to_string()))
                         .map(|favorite| favorite.is_some())?,
                 ),
+                None => None,
+            };
+
+            let vote: Option<Rating> = match user {
+                Some(user) => Vote::find()
+                    .filter(VoteColumn::UserId.eq(user.id))
+                    .filter(VoteColumn::EntryId.eq(entry.id))
+                    .one(&db)
+                    .await
+                    .map_err(|_| Error::InternalError("Oy bulunamadı.".to_string()))
+                    .map(|vote| vote.map(|vote| vote.rating))?,
                 None => None,
             };
 
@@ -538,7 +571,7 @@ pub async fn get_user_entries(
                         is_faded,
                     },
                     is_favorite,
-                    vote: None,
+                    vote,
                     created_at: entry.created_at.and_utc().to_string(),
                     updated_at: entry.updated_at.map(|t| t.and_utc().to_string()),
                 }))

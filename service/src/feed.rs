@@ -56,7 +56,7 @@ pub async fn feed(db: &DbConn, user_id: Option<i32>) -> Result<Vec<EntryDto>> {
                 .await;
 
             let is_favorite: Option<bool> = match user {
-                Some(user) => Some(
+                Some(ref user) => Some(
                     Favorite::find()
                         .filter(FavoriteColumn::UserId.eq(user.id))
                         .filter(FavoriteColumn::EntryId.eq(entry.id))
@@ -65,6 +65,17 @@ pub async fn feed(db: &DbConn, user_id: Option<i32>) -> Result<Vec<EntryDto>> {
                         .map_err(|_| Error::InternalError("Favori bulunamadı.".to_string()))
                         .map(|favorite| favorite.is_some())?,
                 ),
+                None => None,
+            };
+
+            let vote: Option<Rating> = match user {
+                Some(user) => Vote::find()
+                    .filter(VoteColumn::UserId.eq(user.id))
+                    .filter(VoteColumn::EntryId.eq(entry.id))
+                    .one(&db)
+                    .await
+                    .map_err(|_| Error::InternalError("Oy bulunamadı.".to_string()))
+                    .map(|vote| vote.map(|vote| vote.rating))?,
                 None => None,
             };
 
@@ -96,7 +107,7 @@ pub async fn feed(db: &DbConn, user_id: Option<i32>) -> Result<Vec<EntryDto>> {
                         is_faded: author_is_faded,
                     },
                     is_favorite,
-                    vote: None,
+                    vote,
                     created_at: entry.created_at.and_utc().to_string(),
                     updated_at: entry.updated_at.map(|t| t.and_utc().to_string()),
                 }))
