@@ -660,7 +660,7 @@ pub async fn unfavorite_entry(db: &DbConn, user_id: i32, entry_id: i32) -> Resul
     Ok(())
 }
 
-pub async fn upvote(db: &DbConn, user_id: i32, entry_id: i32) -> Result<()> {
+pub async fn vote_entry(db: &DbConn, user_id: i32, entry_id: i32, rating: Rating) -> Result<()> {
     let mut entry = Entry::find()
         .filter(EntryColumn::Id.eq(entry_id))
         .filter(EntryColumn::DeletedAt.is_null())
@@ -690,20 +690,27 @@ pub async fn upvote(db: &DbConn, user_id: i32, entry_id: i32) -> Result<()> {
 
     match vote {
         Some(vote) => {
-            if vote.rating == Rating::Up {
-                return Err(Error::InvalidRequest(
-                    "Zaten olumlu oy verilmiş.".to_string(),
-                ));
+            if vote.rating == rating {
+                return Err(Error::InvalidRequest(format!(
+                    "Zaten {} oy verilmiş.",
+                    if rating == Rating::Up {
+                        "olumlu"
+                    } else {
+                        "olumsuz"
+                    }
+                )));
             }
 
             let mut vote = vote.into_active_model();
-            vote.rating = Set(Rating::Up);
+            vote.rating = Set(rating);
+            vote.updated_at = Set(Some(chrono::Utc::now().naive_utc()));
 
             vote.save(db)
                 .await
                 .map_err(|_| Error::InternalError("Oy güncellenemedi.".to_string()))?;
 
-            entry.net_votes = Set(entry.net_votes.unwrap() + 2);
+            entry.net_votes =
+                Set(entry.net_votes.unwrap() + if rating == Rating::Up { 2 } else { -2 });
             entry
                 .save(db)
                 .await
@@ -715,86 +722,15 @@ pub async fn upvote(db: &DbConn, user_id: i32, entry_id: i32) -> Result<()> {
             VoteActiveModel {
                 user_id: Set(user_id),
                 entry_id: Set(entry_id),
-                rating: Set(Rating::Up),
+                rating: Set(rating),
                 ..Default::default()
             }
             .save(db)
             .await
             .map_err(|_| Error::InternalError("Oy eklenemedi.".to_string()))?;
 
-            entry.net_votes = Set(entry.net_votes.unwrap() + 1);
-            entry
-                .save(db)
-                .await
-                .map_err(|_| Error::InternalError("Oy eklenemedi.".to_string()))?;
-
-            Ok(())
-        }
-    }
-}
-
-pub async fn downvote(db: &DbConn, user_id: i32, entry_id: i32) -> Result<()> {
-    let mut entry = Entry::find()
-        .filter(EntryColumn::Id.eq(entry_id))
-        .filter(EntryColumn::DeletedAt.is_null())
-        .inner_join(Title)
-        .filter(TitleColumn::IsVisible.eq(true))
-        .one(db)
-        .await
-        .map_err(|_| Error::InternalError("Girdi bulunamadı.".to_string()))
-        .and_then(|entry| entry.ok_or(Error::NotFound("Girdi bulunamadı.".to_string())))?
-        .into_active_model();
-
-    User::find()
-        .filter(UserColumn::Id.eq(user_id))
-        .filter(UserColumn::DeletedAt.is_null())
-        .one(db)
-        .await
-        .map_err(|_| Error::InternalError("Kullanıcı bulunamadı.".to_string()))
-        .and_then(|user| user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string())))?;
-
-    let vote = Vote::find()
-        .filter(VoteColumn::UserId.eq(user_id))
-        .filter(VoteColumn::EntryId.eq(entry_id))
-        .one(db)
-        .await
-        .map_err(|_| Error::InternalError("Oy bulunamadı.".to_string()))?;
-
-    match vote {
-        Some(vote) => {
-            if vote.rating == Rating::Down {
-                return Err(Error::InvalidRequest(
-                    "Zaten olumsuz oy verilmiş.".to_string(),
-                ));
-            }
-
-            let mut vote = vote.into_active_model();
-            vote.rating = Set(Rating::Down);
-
-            vote.save(db)
-                .await
-                .map_err(|_| Error::InternalError("Oy güncellenemedi.".to_string()))?;
-
-            entry.net_votes = Set(entry.net_votes.unwrap() - 2);
-            entry
-                .save(db)
-                .await
-                .map_err(|_| Error::InternalError("Oy güncellenemedi.".to_string()))?;
-
-            Ok(())
-        }
-        None => {
-            VoteActiveModel {
-                user_id: Set(user_id),
-                entry_id: Set(entry_id),
-                rating: Set(Rating::Down),
-                ..Default::default()
-            }
-            .save(db)
-            .await
-            .map_err(|_| Error::InternalError("Oy eklenemedi.".to_string()))?;
-
-            entry.net_votes = Set(entry.net_votes.unwrap() - 1);
+            entry.net_votes =
+                Set(entry.net_votes.unwrap() + if rating == Rating::Up { 1 } else { -1 });
             entry
                 .save(db)
                 .await

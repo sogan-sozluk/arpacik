@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 #[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "rating")]
 pub enum Rating {
     #[sea_orm(string_value = "Down")]
+    #[serde(alias = "down")]
     Down,
     #[sea_orm(string_value = "Up")]
+    #[serde(alias = "up")]
     Up,
 }
