@@ -32,6 +32,8 @@ pub struct EntryDto {
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: Option<String>,
+    #[serde(rename = "deletedAt")]
+    pub deleted_at: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate)]

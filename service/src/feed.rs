@@ -110,6 +110,7 @@ pub async fn feed(db: &DbConn, user_id: Option<i32>) -> Result<Vec<EntryDto>> {
                     vote,
                     created_at: entry.created_at.and_utc().to_string(),
                     updated_at: entry.updated_at.map(|t| t.and_utc().to_string()),
+                    deleted_at: entry.deleted_at.map(|t| t.and_utc().to_string()),
                 }))
             } else {
                 Ok(None)
