@@ -221,6 +221,7 @@ pub async fn get_entry(db: &DbConn, id: i32, user_id: Option<i32>) -> Result<Ent
         vote,
         created_at: entry.created_at.and_utc().to_string(),
         updated_at: entry.updated_at.map(|t| t.and_utc().to_string()),
+        deleted_at: entry.deleted_at.map(|t| t.and_utc().to_string()),
     })
 }
 
@@ -424,6 +425,7 @@ pub async fn get_title_entries(
                     vote,
                     created_at: entry.created_at.and_utc().to_string(),
                     updated_at: entry.updated_at.map(|t| t.and_utc().to_string()),
+                    deleted_at: entry.deleted_at.map(|t| t.and_utc().to_string()),
                 }))
             } else {
                 Ok(None)
@@ -575,6 +577,7 @@ pub async fn get_user_entries(
                     vote,
                     created_at: entry.created_at.and_utc().to_string(),
                     updated_at: entry.updated_at.map(|t| t.and_utc().to_string()),
+                    deleted_at: entry.deleted_at.map(|t| t.and_utc().to_string()),
                 }))
             } else {
                 Ok(None)
