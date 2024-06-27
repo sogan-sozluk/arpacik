@@ -101,11 +101,11 @@ pub async fn get_title_entries_by_name(
 pub async fn get_user_entries(
     state: State<AppState>,
     headers: HeaderMap,
-    Path(author_id): Path<i32>,
+    Path(nickname): Path<String>,
     query: Query<PaginationQuery>,
 ) -> Result<Json<PaginationResponse<EntryDto>>, (StatusCode, Json<ErrorBody>)> {
     let user_id = get_user_id_from_headers(&headers, state.auth_from, &state.jwt_secret);
-    match service::entry::get_user_entries(&state.conn, author_id, query.0, user_id).await {
+    match service::entry::get_user_entries(&state.conn, nickname, query.0, user_id).await {
         Ok(entries) => Ok(Json(entries)),
         Err(e) => Err(e.into_error_response()),
     }

@@ -469,7 +469,7 @@ pub async fn get_title_entries_by_name(
 
 pub async fn get_user_entries(
     db: &DbConn,
-    id: i32,
+    nickname: String,
     query: PaginationQuery,
     user_id: Option<i32>,
 ) -> Result<PaginationResponse<EntryDto>> {
@@ -494,10 +494,11 @@ pub async fn get_user_entries(
         None => None,
     };
 
-    let (nickname, is_faded): (String, bool) = User::find()
-        .filter(UserColumn::Id.eq(id))
+    let (author_id, nickname, is_faded): (i32, String, bool) = User::find()
+        .filter(UserColumn::Nickname.eq(nickname))
         .filter(UserColumn::DeletedAt.is_null())
         .select_only()
+        .column(UserColumn::Id)
         .column(UserColumn::Nickname)
         .column(UserColumn::IsFaded)
         .into_tuple()
@@ -507,7 +508,7 @@ pub async fn get_user_entries(
         .and_then(|user| user.ok_or(Error::NotFound("Kullanıcı bulunamadı.".to_string())))?;
 
     let base_query = Entry::find()
-        .filter(EntryColumn::UserId.eq(id))
+        .filter(EntryColumn::UserId.eq(author_id))
         .filter(EntryColumn::DeletedAt.is_null())
         .inner_join(Title)
         .filter(TitleColumn::IsVisible.eq(true));
@@ -566,7 +567,7 @@ pub async fn get_user_entries(
                     },
                     content: entry.content,
                     author: EntryAuthorDto {
-                        id,
+                        id: author_id,
                         nickname,
                         is_faded,
                     },
