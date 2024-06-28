@@ -27,6 +27,7 @@ pub async fn today(
         .filter(TitleColumn::IsVisible.eq(true))
         .inner_join(Entry)
         .filter(EntryColumn::CreatedAt.gt(last_midnight))
+        .filter(EntryColumn::DeletedAt.is_null())
         .group_by(TitleColumn::Id)
         .order_by_desc(TitleColumn::LastEntryAt);
 
@@ -40,6 +41,7 @@ pub async fn today(
     let today_dto_futures = titles.into_iter().map(|title| async move {
         let entry_count = Entry::find()
             .filter(EntryColumn::TitleId.eq(title.id))
+            .filter(EntryColumn::DeletedAt.is_null())
             .filter(EntryColumn::CreatedAt.gt(last_midnight))
             .count(db)
             .await;
