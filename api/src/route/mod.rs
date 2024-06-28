@@ -7,6 +7,7 @@ use axum::{
 use tower_http::cors::CorsLayer;
 
 pub mod auth;
+pub mod bin;
 pub mod entry;
 pub mod feed;
 pub mod hello;
@@ -44,6 +45,8 @@ pub fn build(state: AppState) -> Router {
         .route("/entries/:id/unfavorite", post(entry::unfavorite_entry))
         .route("/entries/:id/vote/:rating", post(entry::vote_entry))
         .route("/entries/:id/unvote", post(entry::unvote_entry))
+        .route("/self/bin", get(bin::get_user_bin))
+        .route("/self/bin", delete(bin::empty_user_bin))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             crate::middleware::auth::auth,

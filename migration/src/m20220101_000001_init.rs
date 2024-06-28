@@ -96,7 +96,8 @@ impl MigrationTrait for Migration {
                         ForeignKey::create()
                             .name("fk-silenced_user-user_id")
                             .from(SilencedUser::Table, SilencedUser::UserId)
-                            .to(User::Table, User::Id),
+                            .to(User::Table, User::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )
@@ -180,13 +181,15 @@ impl MigrationTrait for Migration {
                         ForeignKey::create()
                             .name("fk-entry-user_id")
                             .from(Entry::Table, Entry::UserId)
-                            .to(User::Table, User::Id),
+                            .to(User::Table, User::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk-entry-title_id")
                             .from(Entry::Table, Entry::TitleId)
-                            .to(Title::Table, Title::Id),
+                            .to(Title::Table, Title::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )
@@ -222,13 +225,15 @@ impl MigrationTrait for Migration {
                         ForeignKey::create()
                             .name("fk-vote-entry_id")
                             .from(Vote::Table, Vote::EntryId)
-                            .to(Entry::Table, Entry::Id),
+                            .to(Entry::Table, Entry::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk-vote-user_id")
                             .from(Vote::Table, Vote::UserId)
-                            .to(User::Table, User::Id),
+                            .to(User::Table, User::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )
@@ -258,13 +263,15 @@ impl MigrationTrait for Migration {
                         ForeignKey::create()
                             .name("fk-favorite-entry_id")
                             .from(Favorite::Table, Favorite::EntryId)
-                            .to(Entry::Table, Entry::Id),
+                            .to(Entry::Table, Entry::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk-favorite-user_id")
                             .from(Favorite::Table, Favorite::UserId)
-                            .to(User::Table, User::Id),
+                            .to(User::Table, User::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )
@@ -295,7 +302,8 @@ impl MigrationTrait for Migration {
                         ForeignKey::create()
                             .name("fk-token-user_id")
                             .from(Token::Table, Token::UserId)
-                            .to(User::Table, User::Id),
+                            .to(User::Table, User::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )
