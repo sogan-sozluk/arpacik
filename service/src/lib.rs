@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod bin;
 pub mod cookie;
 pub mod dto;
 pub mod entry;

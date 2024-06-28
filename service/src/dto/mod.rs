@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod bin;
 pub mod entry;
 pub mod order;
 pub mod pagination;

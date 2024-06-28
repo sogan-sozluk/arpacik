@@ -496,6 +496,7 @@ pub async fn get_user_entries(
         None => None,
     };
 
+    // TODO: Do not select nickname again
     let (author_id, nickname, is_faded): (i32, String, bool) = User::find()
         .filter(UserColumn::Nickname.eq(nickname))
         .filter(UserColumn::DeletedAt.is_null())
