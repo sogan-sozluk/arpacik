@@ -85,7 +85,6 @@ pub async fn create_entry(
 pub async fn delete_entry(db: &DbConn, user_id: i32, id: i32, soft_delete: bool) -> Result<()> {
     let entry = Entry::find()
         .filter(EntryColumn::Id.eq(id))
-        .filter(EntryColumn::DeletedAt.is_null())
         .filter(EntryColumn::UserId.eq(user_id))
         .inner_join(User)
         .filter(UserColumn::DeletedAt.is_null())
