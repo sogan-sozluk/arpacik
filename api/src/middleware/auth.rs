@@ -23,7 +23,7 @@ pub async fn auth(
     }
 }
 
-pub async fn auth_moderator(
+pub async fn _auth_moderator(
     State(state): State<AppState>,
     headers: HeaderMap,
     request: Request,
@@ -46,6 +46,24 @@ pub async fn _auth_admin(
 ) -> Result<Response, StatusCode> {
     match headers.token(state.auth_from) {
         Some(token) if authorize(&token, &state.jwt_secret, Role::Admin) => {
+            let response = next.run(request).await;
+            Ok(response)
+        }
+        _ => Err(StatusCode::UNAUTHORIZED),
+    }
+}
+
+pub async fn auth_crew(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    request: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    match headers.token(state.auth_from) {
+        Some(token)
+            if authorize(&token, &state.jwt_secret, Role::Moderator)
+                || authorize(&token, &state.jwt_secret, Role::Admin) =>
+        {
             let response = next.run(request).await;
             Ok(response)
         }

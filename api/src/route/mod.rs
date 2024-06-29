@@ -12,6 +12,7 @@ pub mod entry;
 pub mod feed;
 pub mod hello;
 pub mod search;
+pub mod statistics;
 pub mod title;
 pub mod today;
 pub mod trends;
@@ -52,7 +53,7 @@ pub fn build(state: AppState) -> Router {
             crate::middleware::auth::auth,
         ));
 
-    let moderator = Router::new()
+    let crew = Router::new()
         .route(
             "/entries/:id/to-title/:title_id",
             patch(entry::migrate_entry),
@@ -61,15 +62,16 @@ pub fn build(state: AppState) -> Router {
             "/titles/:id/set-visibility/:is_visible",
             patch(title::set_title_visibility),
         )
+        .route("/statistics", get(statistics::statistics))
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            crate::middleware::auth::auth_moderator,
+            crate::middleware::auth::auth_crew,
         ));
 
     Router::new()
         .nest(prefix, public)
         .nest(prefix, user)
-        .nest(prefix, moderator)
+        .nest(prefix, crew)
         // TODO: Remove this once we have a proper frontend
         .layer(CorsLayer::permissive())
         .with_state(state)
