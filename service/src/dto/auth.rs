@@ -14,7 +14,9 @@ pub struct LoginRequest {
 pub struct LoginResponse {
     pub cookie: Cookie,
     pub token: String,
+    #[serde(rename = "isAdmin")]
     pub is_admin: bool,
+    #[serde(rename = "isModerator")]
     pub is_moderator: bool,
 }
 
